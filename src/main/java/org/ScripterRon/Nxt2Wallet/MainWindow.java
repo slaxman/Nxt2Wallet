@@ -253,8 +253,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                     //tableModel.updateTransactions(chainHeight);
                     break;
                 case "view contacts":
-                    //ContactsDialog.showDialog(this);
-                    //tableModel.fireTableDataChanged();
+                    ContactsDialog.showDialog(this);
+                    for (TransactionTableModel model : tableModel)
+                        model.fireTableDataChanged();
                     break;
             }
         } catch (Exception exc) {
@@ -711,8 +712,10 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                     Contact contact = Main.contactsMap.get(accountId);
                     if (contact != null)
                         value = contact.getName();
-                    else
+                    else if (accountId != 0)
                         value = Utils.getAccountRsId(accountId);
+                    else
+                        value = "";
                     break;
                 case 4:                                 // Amount
                     if (tx.getSenderId() == Main.accountId)

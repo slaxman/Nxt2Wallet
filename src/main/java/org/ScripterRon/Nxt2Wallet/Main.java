@@ -289,14 +289,14 @@ public class Main {
                             String accountString = JOptionPane.showInputDialog("Enter the account");
                             if (accountString == null || accountString.length() == 0)
                                 break;
-                            accountString = accountString.toUpperCase();
+                            accountString = accountString.toUpperCase().trim();
                             if (accountString.startsWith("NXT-")) {
                                 accounts.add(Utils.parseAccountRsId(accountString));
                             } else {
-                                accounts.add(Long.parseUnsignedLong(accountString));
+                                accounts.add(Utils.stringToId(accountString));
                             }
                             secretPhrases.add("");
-                        } catch (NumberFormatException | IdentifierException exc) {
+                        } catch (IdentifierException exc) {
                             JOptionPane.showMessageDialog(null, "Invalid account", "Account Error",
                                                           JOptionPane.ERROR_MESSAGE);
                         } catch (Exception exc) {
@@ -445,11 +445,9 @@ public class Main {
      * Save the contacts
      */
     public static void saveContacts() {
-        try {
-            try (FileOutputStream outStream = new FileOutputStream(contactsFile)) {
-                for (Contact contact : contactsList)
-                    contact.getBytes(outStream);
-            }
+        try (FileOutputStream outStream = new FileOutputStream(contactsFile)) {
+            for (Contact contact : contactsList)
+                contact.getBytes(outStream);
         } catch (IOException exc) {
             logException("Unable to save contacts", exc);
         }
@@ -459,10 +457,8 @@ public class Main {
      * Save the application properties
      */
     public static void saveProperties() {
-        try {
-            try (FileOutputStream out = new FileOutputStream(propFile)) {
-                properties.store(out, "Nxt2Wallet Properties");
-            }
+        try (FileOutputStream out = new FileOutputStream(propFile)) {
+            properties.store(out, "Nxt2Wallet Properties");
         } catch (IOException exc) {
             Main.logException("Exception while saving application properties", exc);
         }
@@ -515,7 +511,7 @@ public class Main {
                         if (value.startsWith("NXT-")) {
                                 accounts.add(Utils.parseAccountRsId(value));
                             } else {
-                                accounts.add(Long.parseUnsignedLong(value));
+                                accounts.add(Utils.stringToId(value));
                             }
                             secretPhrases.add("");
                         break;

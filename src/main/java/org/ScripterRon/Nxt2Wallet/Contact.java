@@ -28,9 +28,6 @@ public class Contact {
     /** Contact name */
     private String name;
 
-    /** Contact address */
-    private String address;
-
     /** Account identifier */
     private long accountId;
 
@@ -41,14 +38,19 @@ public class Contact {
      * Create a new contact
      *
      * @param       name                    Contact name
-     * @param       address                 Contact address
+     * @param       address                 Contact address (Account identifier or Reed-Solomon address)
      * @throws      IdentifierException     Invalid account identifier
      */
     public Contact(String name, String address) throws IdentifierException {
         this.name = name;
-        this.address = address;
-        this.accountId = Utils.stringToId(address);
-        this.accountRsId = Utils.getAccountRsId(accountId);
+        String addr = address.toUpperCase().trim();
+        if (addr.startsWith("NXT-")) {
+            accountId = Utils.parseAccountRsId(addr);
+            accountRsId = addr;
+        } else {
+            accountId = Utils.stringToId(addr);
+            accountRsId = Utils.getAccountRsId(accountId);
+        }
     }
 
     /**
@@ -70,18 +72,16 @@ public class Contact {
             throw new EOFException("End-of-data while processing serialized contact");
         name = new String(nameBytes, "UTF-8");
         //
-        // Decode the contact address
+        // Get the account
         //
-        length = Utils.decodeInteger(inStream);
-        byte[] addressBytes = new byte[length];
-        count = inStream.read(addressBytes);
-        if (count != length)
+        byte[] accountBytes = new byte[8];
+        count = inStream.read(accountBytes);
+        if (count != 8)
             throw new EOFException("End-of-data while processing serialized contact");
-        address = new String(addressBytes, "UTF-8");
-        //
-        // Get the account identifier
-        //
-        accountId = Utils.stringToId(address);
+        accountId = ((long)accountBytes[0] & 0xff) | (((long)accountBytes[1] & 0xff) << 8) |
+                    (((long)accountBytes[2] & 0xff) <<16) | (((long)accountBytes[3] & 0xff) <<24) |
+                    (((long)accountBytes[4] & 0xff) <<32) | (((long)accountBytes[5] & 0xff) <<40) |
+                    (((long)accountBytes[6] & 0xff) <<48) | (((long)accountBytes[7] & 0xff) <<56);
         accountRsId = Utils.getAccountRsId(accountId);
     }
 
@@ -104,23 +104,12 @@ public class Contact {
     }
 
     /**
-     * Return the contact address
+     * Set the contact account identifier
      *
-     * @return                              Contact address
+     * @param       accountId               Account identifier
      */
-    public String getAddress() {
-        return address;
-    }
-
-    /**
-     * Set the contact address
-     *
-     * @param       address                 Contact address
-     * @throws      IdentifierException     Invalid account identifier
-     */
-    public void setAddress(String address) throws IdentifierException {
-        this.address = address;
-        accountId = Utils.stringToId(address);
+    public void setAccountId(long accountId) {
+        this.accountId = accountId;
         accountRsId = Utils.getAccountRsId(accountId);
     }
 
@@ -151,12 +140,12 @@ public class Contact {
     public void getBytes(OutputStream outStream) throws IOException {
         byte[] nameBytes = name.getBytes("UTF-8");
         byte[] nameLength = Utils.encodeInteger(nameBytes.length);
-        byte[] addressBytes = address.getBytes("UTF-8");
-        byte[] addressLength = Utils.encodeInteger(addressBytes.length);
+        byte[] accountBytes = new byte[8];
+        for (int i=0; i<8; i++)
+            accountBytes[i] = (byte)(accountId >>> (i*8));
         outStream.write(nameLength);
         outStream.write(nameBytes);
-        outStream.write(addressLength);
-        outStream.write(addressBytes);
+        outStream.write(accountBytes);
     }
 
     /**
@@ -179,6 +168,6 @@ public class Contact {
      */
     @Override
     public boolean equals(Object obj) {
-        return (obj != null && (obj instanceof Contact) && name.equals(((Contact)obj).name));
+        return ((obj instanceof Contact) && name.equals(((Contact)obj).name));
     }
 }

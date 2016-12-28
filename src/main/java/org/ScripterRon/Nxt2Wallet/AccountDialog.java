@@ -120,12 +120,11 @@ public class AccountDialog extends JDialog implements ActionListener {
                 case "ok":
                     String account = (String)accountField.getSelectedItem();
                     if (account != null)
-                        account = account.trim();
+                        account = account.toUpperCase().trim();
                     if (account == null || account.length() == 0) {
                         JOptionPane.showMessageDialog(this, "No account selected", "Error",
                                                       JOptionPane.ERROR_MESSAGE);
                     } else {
-                        account = account.toUpperCase();
                         if (account.startsWith("NXT-")) {
                             accountId = Utils.parseAccountRsId(account);
                         } else {
