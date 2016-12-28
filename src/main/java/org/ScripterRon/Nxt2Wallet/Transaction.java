@@ -29,6 +29,9 @@ import java.util.Map;
  */
 public class Transaction {
 
+    /** Signature offset in the transaction bytes */
+    public static final int SIGNATURE_OFFSET = 69;
+
     /** Transaction version */
     private final int version;
 
@@ -95,8 +98,14 @@ public class Transaction {
         this.senderId = response.getLong("sender");
         this.recipientId = response.getLong("recipient");
         this.chainId = response.getInt("chain");
-        this.blockId = response.getLong("blockId");
-        this.height = response.getInt("height");
+        int txHeight = response.getInt("height");
+        if (txHeight == 0 || txHeight == Integer.MAX_VALUE) {
+            this.height = 0;
+            this.blockId = 0;
+        } else {
+            this.height = txHeight;
+            this.blockId = response.getLong("blockId");
+        }
         //
         // Get the transaction type
         //
@@ -120,9 +129,8 @@ public class Transaction {
      * @throws  BufferUnderflowException    Transaction bytes too short
      * @throws  NumberFormatException       Invalid hexadecimal format
      */
-    public Transaction(String transactionBytes) throws BufferUnderflowException, NumberFormatException {
-        byte[] bytes = Utils.parseHexString(transactionBytes);
-        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    public Transaction(byte[] transactionBytes) throws BufferUnderflowException, NumberFormatException {
+        ByteBuffer buffer = ByteBuffer.wrap(transactionBytes);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
         this.chainId = buffer.getInt();
         int type = buffer.get();
@@ -136,7 +144,6 @@ public class Transaction {
         this.recipientId = buffer.getLong();
         this.amount = buffer.getLong();
         this.fee = buffer.getLong();
-        int signatureOffset = buffer.position();
         byte[] signature = new byte[64];
         buffer.get(signature);
         //
@@ -158,8 +165,8 @@ public class Transaction {
         //
         // Calculate the transaction identifier
         //
-        byte[] zeroSignature = Arrays.copyOf(bytes, bytes.length);
-        Arrays.fill(zeroSignature, signatureOffset, signatureOffset+64, (byte)0);
+        byte[] zeroSignature = Arrays.copyOf(transactionBytes, transactionBytes.length);
+        Arrays.fill(zeroSignature, SIGNATURE_OFFSET, SIGNATURE_OFFSET+64, (byte)0);
         byte[] signatureHash = Crypto.singleDigest(signature);
         this.fullHash = Crypto.singleDigest(zeroSignature, signatureHash);
         this.id = Utils.fullHashToId(this.fullHash);

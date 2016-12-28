@@ -146,6 +146,9 @@ public class Main {
     /** Account unconfirmed transactions */
     public static final List<Transaction> unconfirmedTransactions = new ArrayList<>();
 
+    /** Account balances */
+    public static final Map<Integer, Long> accountBalance = new HashMap<>();
+
     /** Nxt epoch (milliseconds since January 1, 1970) */
     public static long epochBeginning;
 
@@ -357,7 +360,7 @@ public class Main {
             rates.forEach(rate ->
                     bundlerRates.put(((Long)rate.get("chain")).intValue(), (Long)rate.get("minRateFQTPerFXT")));
             //
-            // Get the account transactions
+            // Get the account transactions and balances
             //
             for (int chainId : chains.keySet()) {
                 List<Map<String, Object>> txList;
@@ -373,6 +376,8 @@ public class Main {
                 if (!txList.isEmpty()) {
                     unconfirmedTransactions.addAll(Transaction.processTransactions(txList));
                 }
+                response = Request.getBalance(accountId, chainId);
+                accountBalance.put(chainId, response.getLong("unconfirmedBalanceNQT"));
             }
             //
             // Start the GUI
@@ -480,7 +485,7 @@ public class Main {
         //
         // Process the configuration file
         //
-        String option = null;
+        String option;
         String value = null;
         try (BufferedReader in = new BufferedReader(new FileReader(configFile))) {
             String line;

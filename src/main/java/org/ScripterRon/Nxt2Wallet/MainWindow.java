@@ -74,7 +74,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         SizedTable.AMOUNT, SizedTable.STATUS};
 
     /** Table count */
-    private int tableCount;
+    private final int tableCount;
 
     /** Main window is minimized */
     private boolean windowMinimized = false;
@@ -87,6 +87,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
 
     /** Last block field */
     private final JLabel chainHeightField;
+
+    /** Tabbed pane containing the transaction tables */
+    private final JTabbedPane tabbedPane;
 
     /** Transaction table */
     private final JTable[] table;
@@ -176,7 +179,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         tableCount = Main.chains.size();
         table = new JTable[tableCount];
         tableModel = new TransactionTableModel[tableCount];
-        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane = new JTabbedPane();
         int index = 0;
         for (Map.Entry<Integer, String> entry : Main.chains.entrySet()) {
             tableModel[index] = new TransactionTableModel(columnNames, columnClasses, entry.getKey());
@@ -249,8 +252,14 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                     exitProgram();
                     break;
                 case "send money":
-                    //SendNxtDialog.showDialog(this);
-                    //tableModel.updateTransactions(chainHeight);
+                    int tab = tabbedPane.getSelectedIndex();
+                    if (tab < 0) {
+                        JOptionPane.showMessageDialog(this, "No transaction pane is selected",
+                                                      "Error", JOptionPane.ERROR_MESSAGE);
+                    } else {
+                        int chainId = tableModel[tab].getChainId();
+                        SendCoinsDialog.showDialog(this, chainId);
+                    }
                     break;
                 case "view contacts":
                     ContactsDialog.showDialog(this);
@@ -311,20 +320,23 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             }
             Main.accountTransactions.clear();
             Main.unconfirmedTransactions.clear();
+            Response response;
             for (int chainId : Main.chains.keySet()) {
                 List<Map<String, Object>> txList;
                 for (int index=0; ; index+=50) {
-                    Response response = Request.getBlockchainTransactions(accountId, chainId, index, index+49);
+                    response = Request.getBlockchainTransactions(accountId, chainId, index, index+49);
                     txList = response.getObjectList("transactions");
                     if (txList.isEmpty())
                         break;
                     Main.accountTransactions.addAll(Transaction.processTransactions(txList));
                 }
-                Response response = Request.getUnconfirmedTransactions(accountId, chainId);
+                response = Request.getUnconfirmedTransactions(accountId, chainId);
                 txList = response.getObjectList("unconfirmedTransactions");
                 if (!txList.isEmpty()) {
                     Main.unconfirmedTransactions.addAll(Transaction.processTransactions(txList));
                 }
+                response = Request.getBalance(Main.accountId, chainId);
+                Main.accountBalance.put(chainId, response.getLong("unconfirmedBalanceNQT"));
             }
             for (TransactionTableModel model : tableModel) {
                 model.resetTransactions();
@@ -381,6 +393,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             eventList.add("Block.BLOCK_PUSHED");
             eventList.add("Block.BLOCK_POPPED");
             eventList.add("Transaction.ADDED_CONFIRMED_TRANSACTIONS." + Main.accountRsId);
+            eventList.add("Transaction.ADDED_UNCONFIRMED_TRANSACTIONS." + Main.accountRsId);
             Request.eventRegister(eventList, false, false);
         } catch (IOException exc) {
             Main.log.error("Unable to register our events", exc);
@@ -420,6 +433,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                             });
                             break;
                         case "Transaction.ADDED_CONFIRMED_TRANSACTIONS":
+                        case "Transaction.ADDED_UNCONFIRMED_TRANSACTIONS":
                             for (String eventId : event.getIds()) {
                                 String[] eventParts = eventId.split(":");
                                 if (eventParts.length != 2) {
@@ -446,6 +460,13 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                             break;
                     }
                 }
+                //
+                // Update the account balances
+                //
+                for (int chainId : Main.chains.keySet()) {
+                    response = Request.getBalance(Main.accountId, chainId);
+                    Main.accountBalance.put(chainId, response.getLong("unconfirmedBalanceNQT"));
+                }
                 SwingUtilities.invokeLater(() -> updateNodeStatus());
             } catch (InterruptedException | InvocationTargetException exc) {
                 Main.log.error("Unable to perform status update", exc);
@@ -466,27 +487,19 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
      * Update the node status
      */
     private void updateNodeStatus() {
-        try {
-            Response response;
-            chainHeightField.setText("<html><b>Chain height:   " + Main.blockHeight + "</b></html>");
-            StringBuilder sb = new StringBuilder(64);
-            sb.append("<html><b>Account balances:   ");
-            boolean firstBalance = true;
-            for (TransactionTableModel model : tableModel) {
-                int chainId = model.getChainId();
-                response = Request.getBalance(Main.accountId, chainId);
-                String balance = Utils.nqtToString(response.getLong("unconfirmedBalanceNQT"));
-                if (!firstBalance)
-                    sb.append(", ");
-                sb.append(balance).append(" ").append(Main.chains.get(chainId));
-                firstBalance = false;
-            }
-            sb.append("</b></html>");
-            balanceField.setText(sb.toString());
-        } catch (IOException exc) {
-            Main.log.error("Unable to issue Nxt API request", exc);
-            Main.logException("Unable to issue Nxt API request", exc);
+        chainHeightField.setText("<html><b>Chain height:   " + Main.blockHeight + "</b></html>");
+        StringBuilder sb = new StringBuilder(64);
+        sb.append("<html><b>Account balances:   ");
+        boolean firstBalance = true;
+        for (Map.Entry<Integer, String> entry : Main.chains.entrySet()) {
+            if (!firstBalance)
+                sb.append(", ");
+            sb.append(Utils.nqtToString(Main.accountBalance.get(entry.getKey())))
+                    .append(" ").append(entry.getValue());
+            firstBalance = false;
         }
+        sb.append("</b></html>");
+        balanceField.setText(sb.toString());
     }
 
     /**
@@ -795,7 +808,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             if (tx.getChainId() == chainId) {
                 Transaction listTx = txMap.get(tx.getId());
                 if (listTx != null) {
-                    if (listTx.getBlockId() != tx.getBlockId()) {
+                    if (listTx.getBlockId() != tx.getBlockId() && tx.getBlockId() != 0) {
                         listTx.setBlockId(tx.getBlockId());
                         listTx.setHeight(tx.getHeight());
                         fireTableRowsUpdated(0, Math.min(txList.size()-1, 9));

@@ -62,6 +62,19 @@ public class Request {
     private static volatile boolean sslInitialized = false;
 
     /**
+     * Broadcast a signed transaction
+     *
+     * @param       transactionBytes        Transaction bytes
+     * @return                              Broadcast response
+     * @throws      IOException             Unable to issue Nxt API request
+     */
+    public static Response broadcastTransaction(byte[] transactionBytes) throws IOException {
+        return issueRequest("broadcastTransaction",
+                "transactionBytes=" + Utils.toHexString(transactionBytes),
+                DEFAULT_READ_TIMEOUT);
+    }
+
+    /**
      * Register wait events
      *
      * An existing event list can be modified by specifying 'addEvents=true' or 'removeEvents=true'.
@@ -206,6 +219,28 @@ public class Request {
                             String.format("account=%s&chain=%s",
                                     Utils.idToString(accountId), Main.chains.get(chainId)),
                             DEFAULT_READ_TIMEOUT);
+    }
+
+    /**
+     * Create a transaction to send money and return the unsigned transaction
+     *
+     * @param       recipientId             Recipient account identifier
+     * @param       chainId                 Transaction chain
+     * @param       amount                  Amount to send
+     * @param       fee                     Transaction fee
+     * @param       publicKey               Sender public key
+     * @return                              Transaction
+     * @throws      IOException             Unable to issue Nxt API request
+     */
+    public static Response sendMoney(long recipientId, int chainId, long amount, long fee, byte[] publicKey)
+                                            throws IOException {
+        return issueRequest("sendMoney",
+                String.format("recipient=%s&chain=%s&amountNQT=%s&feeNQT=%s&publicKey=%s&"
+                                + "deadline=30&broadcast=false",
+                        Utils.idToString(recipientId), Main.chains.get(chainId),
+                                Long.toUnsignedString(amount), Long.toUnsignedString(fee),
+                                Utils.toHexString(publicKey)),
+                DEFAULT_READ_TIMEOUT);
     }
 
     /**
