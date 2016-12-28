@@ -179,6 +179,21 @@ public class Request {
     }
 
     /**
+     * Get a transactions
+     *
+     * @param       fullHash                Transaction full hash
+     * @param       chainId                 Transaction chain
+     * @return                              Transaction
+     * @throws      IOException             Unable to issue Nxt API request
+     */
+    public static Response getTransaction(byte[] fullHash, int chainId) throws IOException {
+        return issueRequest("getTransaction",
+                            String.format("fullHash=%s&chain=%s",
+                                    Utils.toHexString(fullHash), Main.chains.get(chainId)),
+                            DEFAULT_READ_TIMEOUT);
+    }
+
+    /**
      * Get the unconfirmed transactions
      *
      * @param       accountId               Account identifier

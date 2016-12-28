@@ -52,3 +52,6 @@ The following configuration options can be specified in Nxt2Wallet.conf.  This f
     
   - acceptAnyCertificate=boolean	
     Specify 'true' to accept the server certificate without verifying the trust path or 'false' to verify the certificate trust path before accepting the connection.  The default is 'false'.
+    
+  - account=id      
+    Specify the Nxt account as either an identifier or a Reed-Solomon string.  This parameter can be repeated to define multiple accounts.  You will be prompted to enter the account if this parameter is not specified.

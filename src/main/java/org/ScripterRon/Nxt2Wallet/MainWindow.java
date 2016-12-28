@@ -33,7 +33,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -76,12 +75,6 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
 
     /** Table count */
     private int tableCount;
-
-    /** Chain mapping: chainId -> tableIndex */
-    private final Map<Integer, Integer> chainMap = new HashMap<>();
-
-    /** Table mapping: TableIndex -> chainId */
-    private final Map<Integer, Integer> tableMap = new HashMap<>();
 
     /** Main window is minimized */
     private boolean windowMinimized = false;
@@ -180,26 +173,22 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         //
         // Create the transaction tables
         //
-        tableCount = 0;
-        Set<Integer> chainSet = Main.chains.keySet();
-        for (Integer chainId : chainSet) {
-            chainMap.put(chainId, tableCount);
-            tableMap.put(tableCount, chainId);
-            tableCount++;
-        }
+        tableCount = Main.chains.size();
         table = new JTable[tableCount];
         tableModel = new TransactionTableModel[tableCount];
         JTabbedPane tabbedPane = new JTabbedPane();
-        for (int i = 0; i < tableCount; i++) {
-            tableModel[i] = new TransactionTableModel(columnNames, columnClasses, tableMap.get(i));
-            table[i] = new SizedTable(tableModel[i], columnTypes);
-            table[i].setRowSorter(new TableRowSorter<>(tableModel[i]));
-            table[i].setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-            JScrollPane scrollPane = new JScrollPane(table[i]);
+        int index = 0;
+        for (Map.Entry<Integer, String> entry : Main.chains.entrySet()) {
+            tableModel[index] = new TransactionTableModel(columnNames, columnClasses, entry.getKey());
+            table[index] = new SizedTable(tableModel[index], columnTypes);
+            table[index].setRowSorter(new TableRowSorter<>(tableModel[index]));
+            table[index].setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            JScrollPane scrollPane = new JScrollPane(table[index]);
             JPanel tablePane = new JPanel(new BorderLayout());
             tablePane.setBackground(Color.WHITE);
             tablePane.add(scrollPane, BorderLayout.CENTER);
-            tabbedPane.addTab(Main.chains.get(tableMap.get(i)), tablePane);
+            tabbedPane.addTab(entry.getValue(), tablePane);
+            index++;
         }
         //
         // Create the button pane
@@ -301,7 +290,51 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
      * Change the Nxt account
      */
     private void changeAccount() {
-
+        //
+        // Get the account
+        //
+        long accountId = AccountDialog.showDialog(this);
+        if (accountId == 0)
+            return;
+        //
+        // Switch to the new account
+        //
+        try {
+            Main.accountId = accountId;
+            Main.accountRsId = Utils.getAccountRsId(accountId);
+            int i = Main.accounts.indexOf(accountId);
+            if (i >= 0) {
+                Main.passPhrase = Main.secretPhrases.get(i);
+            } else {
+                Main.passPhrase = "";
+            }
+            Main.accountTransactions.clear();
+            Main.unconfirmedTransactions.clear();
+            for (int chainId : Main.chains.keySet()) {
+                List<Map<String, Object>> txList;
+                for (int index=0; ; index+=50) {
+                    Response response = Request.getBlockchainTransactions(accountId, chainId, index, index+49);
+                    txList = response.getObjectList("transactions");
+                    if (txList.isEmpty())
+                        break;
+                    Main.accountTransactions.addAll(Transaction.processTransactions(txList));
+                }
+                Response response = Request.getUnconfirmedTransactions(accountId, chainId);
+                txList = response.getObjectList("unconfirmedTransactions");
+                if (!txList.isEmpty()) {
+                    Main.unconfirmedTransactions.addAll(Transaction.processTransactions(txList));
+                }
+            }
+            for (TransactionTableModel model : tableModel) {
+                model.resetTransactions();
+            }
+            String accountIdString = Utils.idToString(Main.accountId) + " / " + Main.accountRsId;
+            accountField.setText("<html><b>Account:   " + accountIdString + "</b></html>");
+            updateNodeStatus();
+        } catch (IOException exc) {
+            Main.log.error("Unable to get initial account information", exc);
+            Main.logException("Unable to get initial account information", exc);
+        }
     }
 
     /**
@@ -346,6 +379,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             List<String> eventList = new ArrayList<>();
             eventList.add("Block.BLOCK_PUSHED");
             eventList.add("Block.BLOCK_POPPED");
+            eventList.add("Transaction.ADDED_CONFIRMED_TRANSACTIONS." + Main.accountRsId);
             Request.eventRegister(eventList, false, false);
         } catch (IOException exc) {
             Main.log.error("Unable to register our events", exc);
@@ -374,54 +408,44 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 //
                 Response response;
                 for (Event event : eventList) {
-                    String eventId = event.getIds().get(0);
                     switch (event.getName()) {
                         case "Block.BLOCK_PUSHED":
                             response = Request.getBlockchainStatus();
                             Main.blockHeight = response.getInt("numberOfBlocks") - 1;
-                            for (int index=0; ; index+=5) {
-                                final Response[] txResponses = new Response[tableModel.length];
-                                final Boolean[] txMatches = new Boolean[tableModel.length];
-                                for (int i=0; i<tableModel.length; i++) {
-                                    TransactionTableModel model = tableModel[i];
-                                    txResponses[i] = Request.getBlockchainTransactions(
-                                            Main.accountId, model.getChainId(), index, index+4);
+                            SwingUtilities.invokeAndWait(() -> {
+                                for (TransactionTableModel model : tableModel) {
+                                    model.updateTransactionStatus();
                                 }
-                                SwingUtilities.invokeAndWait(() -> {
-                                    for (int j=0; j<tableModel.length; j++) {
-                                        TransactionTableModel model = tableModel[j];
-                                        List<Map<String, Object>> mapList =
-                                                txResponses[j].getObjectList("transactions");
-                                        if (mapList.isEmpty()) {
-                                            txMatches[j] = true;
-                                        } else {
-                                            List<Transaction> txList =
-                                                    Transaction.processTransactions(mapList);
-                                            txMatches[j] = model.addTransactions(txList);
+                            });
+                            break;
+                        case "Transaction.ADDED_CONFIRMED_TRANSACTIONS":
+                            for (String eventId : event.getIds()) {
+                                String[] eventParts = eventId.split(":");
+                                if (eventParts.length != 2) {
+                                    Main.log.error("Invalid transaction event id: " + eventId);
+                                } else {
+                                    int chainId = Integer.valueOf(eventParts[0]);
+                                    byte[] fullHash = Utils.parseHexString(eventParts[1]);
+                                    response = Request.getTransaction(fullHash, chainId);
+                                    final Transaction addedTx = new Transaction(response);
+                                    SwingUtilities.invokeAndWait(() -> {
+                                        for (TransactionTableModel model : tableModel) {
+                                            model.addTransaction(addedTx);
                                         }
-                                    }
-                                });
-                                boolean matched = true;
-                                for (Boolean match : txMatches) {
-                                    if (!match) {
-                                        matched = false;
-                                        break;
-                                    }
+                                    });
                                 }
-                                if (matched)
-                                    break;
-                                }
+                            }
                             break;
                         case "Block.BLOCK_POPPED":
-                            final long popBlockId = Utils.stringToId(eventId);
-                            SwingUtilities.invokeAndWait(() -> {
+                            final long popBlockId = Utils.stringToId(event.getIds().get(0));
+                            SwingUtilities.invokeLater(() -> {
                                 for (TransactionTableModel model : tableModel)
                                     model.popTransactions(popBlockId);
                             });
                             break;
                     }
                 }
-                SwingUtilities.invokeAndWait(() -> updateNodeStatus());
+                SwingUtilities.invokeLater(() -> updateNodeStatus());
             } catch (InterruptedException | InvocationTargetException exc) {
                 Main.log.error("Unable to perform status update", exc);
                 Main.logException("Unable to perform status update", exc);
@@ -447,8 +471,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             StringBuilder sb = new StringBuilder(64);
             sb.append("<html><b>Account balances:   ");
             boolean firstBalance = true;
-            for (int i=0; i<tableCount; i++) {
-                int chainId = tableMap.get(i);
+            for (TransactionTableModel model : tableModel) {
+                int chainId = model.getChainId();
                 response = Request.getBalance(Main.accountId, chainId);
                 String balance = Utils.nqtToString(response.getLong("unconfirmedBalanceNQT"));
                 if (!firstBalance)
@@ -760,56 +784,42 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         }
 
         /**
-         * Add account transactions
-         *
-         * @param       transactions    Transaction list
-         * @return                      TRUE if the transaction list is synchronized
-         */
-        public boolean addTransactions(List<Transaction> transactions) {
-            boolean matched = false;
-            boolean modified = false;
-            boolean updated = false;
-            for (Transaction tx : transactions) {
-                if (tx.getChainId() == chainId) {
-                    Transaction listTx = txMap.get(tx.getId());
-                    if (listTx != null) {
-                        if (listTx.getBlockId() == tx.getBlockId()) {
-                            matched = true;
-                            if (Main.blockHeight - listTx.getHeight() == CONFIRM_COUNT)
-                                updated = true;
-                        } else {
-                            listTx.setBlockId(tx.getBlockId());
-                            listTx.setHeight(tx.getHeight());
-                        }
-                    } else {
-                        txList.add(tx);
-                        txMap.put(tx.getId(), tx);
-                        modified = true;
-                    }
-                }
-            }
-            if (modified) {
-                Collections.sort(txList, (o1, o2) -> {
-                    int c = (o1.getTimestamp().compareTo(o2.getTimestamp()));
-                    return (c < 0 ? 1 : (c > 0 ? -1 : 0));
-                });
-                fireTableDataChanged();
-            } else if (updated) {
-                fireTableRowsUpdated(0, Math.min(txList.size()-1, 4));
-            }
-            return matched;
-        }
-
-        /**
-         * Add a new unconfirmed account transaction (assumed to be newest transaction)
+         * Add a confirmed account transaction
          *
          * @param       tx              Transaction
          */
-        public void addUnconfirmedTransaction(Transaction tx) {
+        public void addTransaction(Transaction tx) {
             if (tx.getChainId() == chainId) {
-                txList.add(0, tx);
-                txMap.put(tx.getId(), tx);
-                fireTableRowsInserted(0, 0);
+                Transaction listTx = txMap.get(tx.getId());
+                if (listTx != null) {
+                    if (listTx.getBlockId() != tx.getBlockId()) {
+                        listTx.setBlockId(tx.getBlockId());
+                        listTx.setHeight(tx.getHeight());
+                        fireTableRowsUpdated(0, Math.min(txList.size()-1, 9));
+                    }
+                } else {
+                    txList.add(tx);
+                    txMap.put(tx.getId(), tx);
+                    Collections.sort(txList, (o1, o2) -> {
+                        int c = (o1.getTimestamp().compareTo(o2.getTimestamp()));
+                        return (c < 0 ? 1 : (c > 0 ? -1 : 0));
+                    });
+                    fireTableDataChanged();
+                }
+            }
+        }
+
+        /**
+         * Update transaction status
+         */
+        public void updateTransactionStatus() {
+            for (int i=0; i<10; i++) {
+                if (i == txList.size())
+                    break;
+                if (Main.blockHeight - txList.get(i).getHeight() == CONFIRM_COUNT) {
+                    fireTableRowsUpdated(0, Math.min(txList.size()-1, 9));
+                    break;
+                }
             }
         }
 

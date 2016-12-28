@@ -104,11 +104,11 @@ public class Main {
     /** Secret phrases */
     public static List<String> secretPhrases = new ArrayList<>();
 
+    /** Accounts */
+    public static List<Long> accounts = new ArrayList<>();
+
     /** Account password phrase */
     public static String passPhrase;
-
-    /** Account public key */
-    public static byte[] publicKey;
 
     /** Account identifier */
     public static long accountId;
@@ -280,21 +280,37 @@ public class Main {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             //
-            // Get the account password phrase if it is not specified in the configuration file
+            // Get the account if one wasn't provided
             //
-            if (secretPhrases.isEmpty()) {
-                javax.swing.SwingUtilities.invokeAndWait(() ->
-                    passPhrase = JOptionPane.showInputDialog("Enter the account password phrase"));
-                if (passPhrase == null || passPhrase.length() == 0)
+            if (accounts.isEmpty()) {
+                javax.swing.SwingUtilities.invokeAndWait(() -> {
+                    while (accounts.isEmpty()) {
+                        try {
+                            String accountString = JOptionPane.showInputDialog("Enter the account");
+                            if (accountString == null || accountString.length() == 0)
+                                break;
+                            accountString = accountString.toUpperCase();
+                            if (accountString.startsWith("NXT-")) {
+                                accounts.add(Utils.parseAccountRsId(accountString));
+                            } else {
+                                accounts.add(Long.parseUnsignedLong(accountString));
+                            }
+                            secretPhrases.add("");
+                        } catch (NumberFormatException | IdentifierException exc) {
+                            JOptionPane.showMessageDialog(null, "Invalid account", "Account Error",
+                                                          JOptionPane.ERROR_MESSAGE);
+                        } catch (Exception exc) {
+                            Main.log.error("Exception while getting account", exc);
+                            Main.logException("Exception while getting account", exc);
+                            break;
+                        }
+                    }
+                });
+                if (accounts.isEmpty())
                     System.exit(0);
-            } else {
-                passPhrase = secretPhrases.get(0);
             }
-            //
-            // Get the account identifier
-            //
-            publicKey = Crypto.getPublicKey(passPhrase);
-            accountId = Utils.getAccountId(publicKey);
+            passPhrase = secretPhrases.get(0);
+            accountId = accounts.get(0);
             accountRsId = Utils.getAccountRsId(accountId);
             //
             // Get the local Nxt node state
@@ -364,10 +380,12 @@ public class Main {
             javax.swing.SwingUtilities.invokeLater(() -> {
                 createAndShowGUI();
             });
-        } catch (KeyException exc) {
-            logException("Unable to generate account identifier", exc);
+        } catch (IOException exc) {
+            log.error("Unable to get initial account information", exc);
+            logException("Unable to get initial account information", exc);
             shutdown();
         } catch (Exception exc) {
+            log.error("Exception while starting account services", exc);
             logException("Exception while starting account services", exc);
             shutdown();
         }
@@ -380,20 +398,25 @@ public class Main {
      * problems with other window events
      */
     private static void createAndShowGUI() {
-        //
-        // Use the normal window decorations as defined by the look-and-feel
-        // schema
-        //
-        JFrame.setDefaultLookAndFeelDecorated(true);
-        //
-        // Create the main application window
-        //
-        mainWindow = new MainWindow();
-        //
-        // Show the application window
-        //
-        mainWindow.pack();
-        mainWindow.setVisible(true);
+        try {
+            //
+            // Use the normal window decorations as defined by the look-and-feel
+            // schema
+            //
+            JFrame.setDefaultLookAndFeelDecorated(true);
+            //
+            // Create the main application window
+            //
+            mainWindow = new MainWindow();
+            //
+            // Show the application window
+            //
+            mainWindow.pack();
+            mainWindow.setVisible(true);
+        } catch (Exception exc) {
+            log.error("Unable to create GUI", exc);
+            Main.logException("Unable to create GUI", exc);
+        }
     }
 
     /**
@@ -455,12 +478,14 @@ public class Main {
         //
         // Use the defaults if there is no configuration file
         //
-        File configFile = new File(dataPath+Main.fileSeparator+"Nxt2Wallet.conf");
+        File configFile = new File(dataPath + Main.fileSeparator + "Nxt2Wallet.conf");
         if (!configFile.exists())
             return;
         //
         // Process the configuration file
         //
+        String option = null;
+        String value = null;
         try (BufferedReader in = new BufferedReader(new FileReader(configFile))) {
             String line;
             while ((line=in.readLine()) != null) {
@@ -470,8 +495,8 @@ public class Main {
                 int sep = line.indexOf('=');
                 if (sep < 1)
                     throw new IllegalArgumentException(String.format("Invalid configuration option: %s", line));
-                String option = line.substring(0, sep).trim().toLowerCase();
-                String value = line.substring(sep+1).trim();
+                option = line.substring(0, sep).trim().toLowerCase();
+                value = line.substring(sep+1).trim();
                 switch (option) {
                     case "acceptanycertificate":
                         acceptAnyCertificate = Boolean.valueOf(value);
@@ -483,10 +508,20 @@ public class Main {
                         apiPort = Integer.valueOf(value);
                         break;
                     case "connect":
-                        connect = value;
+                        connect = value.toLowerCase();
+                        break;
+                    case "account":
+                        value = value.toUpperCase();
+                        if (value.startsWith("NXT-")) {
+                                accounts.add(Utils.parseAccountRsId(value));
+                            } else {
+                                accounts.add(Long.parseUnsignedLong(value));
+                            }
+                            secretPhrases.add("");
                         break;
                     case "passphrase":
                         secretPhrases.add(value);
+                        accounts.add(Utils.getAccountId(Crypto.getPublicKey(value)));
                         break;
                     case "usessl":
                         useSSL = Boolean.valueOf(value);
@@ -495,6 +530,14 @@ public class Main {
                         throw new IllegalArgumentException(String.format("Invalid configuration option: %s", line));
                 }
             }
+        } catch (IdentifierException exc) {
+            logException("Account identifier '" + value + "' is not valid", exc);
+        } catch (NumberFormatException exc) {
+            logException("'" + value + "' is not a valid number", exc);
+        } catch (KeyException exc) {
+            logException("Unable to generate account identifier from secret phrase", exc);
+        } catch (IOException exc) {
+            logException("Unable to read configuration file", exc);
         }
     }
 
