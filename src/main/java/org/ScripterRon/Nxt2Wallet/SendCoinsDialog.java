@@ -48,8 +48,14 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
     /** Fee field */
     private final JTextField feeField;
 
+    /** Exchange rate field */
+    private final JTextField rateField;
+
     /** Chain identifier */
     private final int chainId;
+
+    /** Chain name */
+    private final String chainName;
 
     /** Send address */
     private long sendAddress;
@@ -60,6 +66,9 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
     /** Send fee */
     private long sendFee = 0;
 
+    /** Send rate */
+    private long sendRate = 0;
+
     /**
      * Create the dialog
      *
@@ -67,9 +76,10 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
      * @param       chainId         Chain identifier
      */
     public SendCoinsDialog(JFrame parent, int chainId) {
-        super(parent, "Send Coins", Dialog.ModalityType.DOCUMENT_MODAL);
+        super(parent, "Send " + Main.chains.get(chainId), Dialog.ModalityType.DOCUMENT_MODAL);
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         this.chainId = chainId;
+        this.chainName = Main.chains.get(chainId);
         //
         // Create the address field
         //
@@ -96,9 +106,16 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         amountPane.add(new JLabel("Amount  ", JLabel.RIGHT));
         amountPane.add(amountField);
         //
+        // Create the bundler exchange rate field
+        //
+        rateField = new JTextField("", 10);
+        JPanel ratePane = new JPanel();
+        ratePane.add(new JLabel("Exchange rate  ", JLabel.RIGHT));
+        ratePane.add(rateField);
+        //
         // Create the fee field
         //
-        feeField = new JTextField("1", 10);
+        feeField = new JTextField("", 10);
         JPanel feePane = new JPanel();
         feePane.add(new JLabel("Fee  ", JLabel.RIGHT));
         feePane.add(feeField);
@@ -118,6 +135,13 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         contentPane.add(Box.createVerticalStrut(15));
         contentPane.add(amountPane);
         contentPane.add(Box.createVerticalStrut(15));
+        if (chainId != Main.fxtChainId) {
+            Long rate = Main.bundlerRates.get(chainId);
+            if (rate != null)
+                rateField.setText(Utils.nqtToString(rate));
+            contentPane.add(ratePane);
+            contentPane.add(Box.createVerticalStrut(15));
+        }
         contentPane.add(feePane);
         contentPane.add(Box.createVerticalStrut(15));
         contentPane.add(buttonPane);
@@ -157,21 +181,14 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
             switch (action) {
                 case "send":
                     if (checkFields()) {
-                        String confirmText = String.format("Do you want to send %s %s to %s?",
-                                Utils.nqtToString(sendAmount),
-                                Main.chains.get(chainId),
-                                Utils.getAccountRsId(sendAddress));
-                        if (JOptionPane.showConfirmDialog(this, confirmText, "Send Coins",
-                                JOptionPane.YES_NO_OPTION,
-                                JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION) {
-                            if (sendCoins()) {
-                                JOptionPane.showMessageDialog(this, "Coins sent to "
-                                        + Utils.getAccountRsId(sendAddress), "Coins Sent",
-                                        JOptionPane.INFORMATION_MESSAGE);
-                            } else {
-                                JOptionPane.showMessageDialog(this, "Coins were not sent",
-                                        "Coins Not Sent", JOptionPane.INFORMATION_MESSAGE);
-                            }
+                        if (sendCoins()) {
+                            JOptionPane.showMessageDialog(this,
+                                    chainName + " sent to " + Utils.getAccountRsId(sendAddress),
+                                    "Coins Sent", JOptionPane.INFORMATION_MESSAGE);
+                        } else {
+                            JOptionPane.showMessageDialog(this,
+                                    chainName + " was not sent",
+                                    "Coins Not Sent", JOptionPane.INFORMATION_MESSAGE);
                         }
                     }
                     break;
@@ -216,33 +233,19 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
             //
             // Get the send amount
             //
-            String amountString = amountField.getText().trim();
-            if (amountString.isEmpty()) {
+            sendAmount = Utils.stringToNQT(amountField.getText().trim());
+            if (sendAmount <= 0) {
                 JOptionPane.showMessageDialog(this, "You must enter the amount to send",
                                               "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
             }
-            sendAmount = Utils.stringToNQT(amountString);
             //
-            // Get the fee amount
+            // Get the fee amount and the exchange rate
             //
-            String feeString = feeField.getText().trim();
-            if (feeString.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "You must enter a transaction fee",
-                                              "Enter", JOptionPane.ERROR_MESSAGE);
-                return false;
-            }
-            sendFee = Utils.stringToNQT(feeString);
-            //
-            // Check account balance
-            //
-            if (sendAmount + sendFee > Main.accountBalance.get(chainId)) {
-                JOptionPane.showMessageDialog(this, "You do not have enough " + Main.chains.get(chainId),
-                                              "Error", JOptionPane.ERROR_MESSAGE);
-                return false;
-            }
+            sendFee = Utils.stringToNQT(feeField.getText().trim());
+            sendRate = Utils.stringToNQT(rateField.getText().trim());
         } catch (NumberFormatException exc) {
-            JOptionPane.showMessageDialog(this, "Amount or fee is not a valid number", "Error",
+            JOptionPane.showMessageDialog(this, "Numeric value is not valid", "Error",
                                           JOptionPane.ERROR_MESSAGE);
             return false;
         } catch (IdentifierException exc) {
@@ -276,13 +279,28 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         boolean broadcasted = false;
         try {
             byte[] publicKey = Crypto.getPublicKey(secretPhrase);
-            Response response = Request.sendMoney(sendAddress, chainId, sendAmount, sendFee, publicKey);
+            Response response = Request.sendMoney(sendAddress, chainId, sendAmount, sendFee, sendRate,
+                    publicKey);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Transaction tx = new Transaction(txBytes);
+            if (sendFee == 0)
+                sendFee = tx.getFee();
             if (tx.getRecipientId() != sendAddress || tx.getAmount() != sendAmount ||
                     tx.getFee() != sendFee || tx.getSenderId() != Main.accountId) {
                 JOptionPane.showMessageDialog(this, "Transaction returned by Nxt node is not valid",
                                               "Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+            String confirmText = String.format("Do you want to send %s %s with fee %s to %s?",
+                            Utils.nqtToString(sendAmount), chainName,
+                            Utils.nqtToString(sendFee), Utils.getAccountRsId(sendAddress));
+            if (JOptionPane.showConfirmDialog(this, confirmText, "Send Coins",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
+                return false;
+            if (sendAmount + sendFee > Main.accountBalance.get(chainId)) {
+                JOptionPane.showMessageDialog(this, "You do not have enough " + chainName,
+                                          "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
             }
             byte[] signature = Crypto.sign(txBytes, secretPhrase);

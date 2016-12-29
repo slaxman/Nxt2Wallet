@@ -73,9 +73,6 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         SizedTable.DATE, SizedTable.ADDRESS, SizedTable.TYPE, SizedTable.ADDRESS, SizedTable.AMOUNT,
         SizedTable.AMOUNT, SizedTable.STATUS};
 
-    /** Table count */
-    private final int tableCount;
-
     /** Main window is minimized */
     private boolean windowMinimized = false;
 
@@ -87,6 +84,12 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
 
     /** Last block field */
     private final JLabel chainHeightField;
+
+    /** Table count */
+    private final int tableCount;
+
+    /** Table map */
+    private final Map<Integer, TransactionTableModel> tableMap = new HashMap<>();
 
     /** Tabbed pane containing the transaction tables */
     private final JTabbedPane tabbedPane;
@@ -161,8 +164,11 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         //
         // Create the account pane
         //
-        String accountIdString = Utils.idToString(Main.accountId) + " / " + Main.accountRsId;
-        accountField = new JLabel("<html><b>Account:   " + accountIdString + "</b></html>", JLabel.CENTER);
+        StringBuilder sb = new StringBuilder(64);
+        sb.append(Utils.idToString(Main.accountId)).append(" / ").append(Main.accountRsId);
+        if (Main.accountName.length() != 0)
+            sb.append(" (").append(Main.accountName).append(")");
+        accountField = new JLabel("<html><b>Account:   " + sb.toString() + "</b></html>", JLabel.CENTER);
         balanceField = new JLabel("<html><b>Balances:   </b></html>", JLabel.CENTER);
         chainHeightField = new JLabel("<html><b>Chain height</b></html>", JLabel.CENTER);
         JPanel accountPane = new JPanel();
@@ -191,6 +197,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             tablePane.setBackground(Color.WHITE);
             tablePane.add(scrollPane, BorderLayout.CENTER);
             tabbedPane.addTab(entry.getValue(), tablePane);
+            tableMap.put(entry.getKey(), tableModel[index]);
             index++;
         }
         //
@@ -320,29 +327,15 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             }
             Main.accountTransactions.clear();
             Main.unconfirmedTransactions.clear();
-            Response response;
-            for (int chainId : Main.chains.keySet()) {
-                List<Map<String, Object>> txList;
-                for (int index=0; ; index+=50) {
-                    response = Request.getBlockchainTransactions(accountId, chainId, index, index+49);
-                    txList = response.getObjectList("transactions");
-                    if (txList.isEmpty())
-                        break;
-                    Main.accountTransactions.addAll(Transaction.processTransactions(txList));
-                }
-                response = Request.getUnconfirmedTransactions(accountId, chainId);
-                txList = response.getObjectList("unconfirmedTransactions");
-                if (!txList.isEmpty()) {
-                    Main.unconfirmedTransactions.addAll(Transaction.processTransactions(txList));
-                }
-                response = Request.getBalance(Main.accountId, chainId);
-                Main.accountBalance.put(chainId, response.getLong("unconfirmedBalanceNQT"));
-            }
+            Main.getAccount();
             for (TransactionTableModel model : tableModel) {
                 model.resetTransactions();
             }
-            String accountIdString = Utils.idToString(Main.accountId) + " / " + Main.accountRsId;
-            accountField.setText("<html><b>Account:   " + accountIdString + "</b></html>");
+            StringBuilder sb = new StringBuilder(64);
+            sb.append(Utils.idToString(Main.accountId)).append(" / ").append(Main.accountRsId);
+            if (Main.accountName.length() != 0)
+                sb.append(" (").append(Main.accountName).append(")");
+            accountField.setText("<html><b>Account:   " + sb.toString() + "</b></html>");
             updateNodeStatus();
         } catch (IOException exc) {
             Main.log.error("Unable to get initial account information", exc);
@@ -439,14 +432,12 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                                 if (eventParts.length != 2) {
                                     Main.log.error("Invalid transaction event id: " + eventId);
                                 } else {
-                                    int chainId = Integer.valueOf(eventParts[0]);
+                                    final int txChainId = Integer.valueOf(eventParts[0]);
                                     byte[] fullHash = Utils.parseHexString(eventParts[1]);
-                                    response = Request.getTransaction(fullHash, chainId);
+                                    response = Request.getTransaction(fullHash, txChainId);
                                     final Transaction addedTx = new Transaction(response);
                                     SwingUtilities.invokeAndWait(() -> {
-                                        for (TransactionTableModel model : tableModel) {
-                                            model.addTransaction(addedTx);
-                                        }
+                                        tableMap.get(txChainId).addTransaction(addedTx);
                                     });
                                 }
                             }
@@ -811,7 +802,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                     if (listTx.getBlockId() != tx.getBlockId() && tx.getBlockId() != 0) {
                         listTx.setBlockId(tx.getBlockId());
                         listTx.setHeight(tx.getHeight());
-                        fireTableRowsUpdated(0, Math.min(txList.size()-1, 9));
+                        fireTableDataChanged();
                     }
                 } else {
                     txList.add(tx);
@@ -851,6 +842,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                     tx.setHeight(0);
                 }
             });
+            fireTableDataChanged();
         }
     }
 }

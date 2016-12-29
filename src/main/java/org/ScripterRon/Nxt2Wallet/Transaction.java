@@ -104,7 +104,7 @@ public class Transaction {
             this.blockId = 0;
         } else {
             this.height = txHeight;
-            this.blockId = response.getLong("blockId");
+            this.blockId = response.getLong("block");
         }
         //
         // Get the transaction type

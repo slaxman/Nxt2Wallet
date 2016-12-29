@@ -101,6 +101,12 @@ public class Main {
     /** Accept any server certificate */
     public static boolean acceptAnyCertificate = false;
 
+    /** Nxt node application */
+    public static String nxtApplication;
+
+    /** Nxt node version */
+    public static String nxtVersion;
+
     /** Secret phrases */
     public static List<String> secretPhrases = new ArrayList<>();
 
@@ -116,11 +122,8 @@ public class Main {
     /** Account Reed-Solomon identifier */
     public static String accountRsId;
 
-    /** Nxt node application */
-    public static String nxtApplication;
-
-    /** Nxt node version */
-    public static String nxtVersion;
+    /** Account name */
+    public static String accountName;
 
     /** Current block height */
     public static int blockHeight;
@@ -133,6 +136,9 @@ public class Main {
 
     /** Nxt chains */
     public static final Map<Integer, String> chains = new HashMap<>();
+
+    /** FXT (ARDR) chain identifier */
+    public static int fxtChainId;
 
     /** Nxt transaction types */
     public static final Map<Integer, Map<Integer, String>> transactionTypes = new HashMap<>();
@@ -323,7 +329,7 @@ public class Main {
             nxtVersion = response.getString("version");
             blockHeight = response.getInt("numberOfBlocks") - 1;
             log.info(String.format("%s Version %s: Chain height %,d",
-                     nxtApplication, nxtVersion, blockHeight));
+                                   nxtApplication, nxtVersion, blockHeight));
             //
             // Get the Nxt configuration
             //
@@ -335,6 +341,8 @@ public class Main {
             Set<Map.Entry<String, Object>> chainSet = response.getObject("chains").entrySet();
             chainSet.forEach(entry -> {
                 chains.put(((Long)entry.getValue()).intValue(), entry.getKey());
+                if (entry.getKey().equals("ARDR"))
+                    fxtChainId = ((Long)entry.getValue()).intValue();
             });
             //
             // Get the transaction types
@@ -357,28 +365,14 @@ public class Main {
             //
             response = Request.getBundlerRates();
             List<Map<String, Object>> rates = response.getObjectList("rates");
-            rates.forEach(rate ->
-                    bundlerRates.put(((Long)rate.get("chain")).intValue(), (Long)rate.get("minRateFQTPerFXT")));
+            rates.forEach(rate -> {
+                Response rateResponse = new Response(rate);
+                bundlerRates.put(rateResponse.getInt("chain"), rateResponse.getLong("minRateNQTPerFXT"));
+             });
             //
-            // Get the account transactions and balances
+            // Get the initial account information
             //
-            for (int chainId : chains.keySet()) {
-                List<Map<String, Object>> txList;
-                for (int index=0; ; index+=50) {
-                    response = Request.getBlockchainTransactions(accountId, chainId, index, index+49);
-                    txList = response.getObjectList("transactions");
-                    if (txList.isEmpty())
-                        break;
-                    accountTransactions.addAll(Transaction.processTransactions(txList));
-                }
-                response = Request.getUnconfirmedTransactions(accountId, chainId);
-                txList = response.getObjectList("unconfirmedTransactions");
-                if (!txList.isEmpty()) {
-                    unconfirmedTransactions.addAll(Transaction.processTransactions(txList));
-                }
-                response = Request.getBalance(accountId, chainId);
-                accountBalance.put(chainId, response.getLong("unconfirmedBalanceNQT"));
-            }
+            getAccount();
             //
             // Start the GUI
             //
@@ -393,6 +387,33 @@ public class Main {
             log.error("Exception while starting account services", exc);
             logException("Exception while starting account services", exc);
             shutdown();
+        }
+    }
+
+    /**
+     * Get account information
+     *
+     * @throws  IOException         Unable to issue Nxt API request
+     */
+    public static void getAccount() throws IOException {
+        Response response = Request.getAccount(accountId);
+        accountName = response.getString("name");
+        for (int chainId : chains.keySet()) {
+            List<Map<String, Object>> txList;
+            for (int index=0; ; index+=50) {
+                response = Request.getBlockchainTransactions(accountId, chainId, index, index+49);
+                txList = response.getObjectList("transactions");
+                if (txList.isEmpty())
+                    break;
+                accountTransactions.addAll(Transaction.processTransactions(txList));
+            }
+            response = Request.getUnconfirmedTransactions(accountId, chainId);
+            txList = response.getObjectList("unconfirmedTransactions");
+            if (!txList.isEmpty()) {
+                unconfirmedTransactions.addAll(Transaction.processTransactions(txList));
+            }
+            response = Request.getBalance(accountId, chainId);
+            accountBalance.put(chainId, response.getLong("unconfirmedBalanceNQT"));
         }
     }
 

@@ -129,6 +129,19 @@ public class Request {
     }
 
     /**
+     * Get an account
+     *
+     * @param       accountId               Account identifier
+     * @return                              Account information
+     * @throws      IOException             Unable to issue Nxt API request
+     */
+    public static Response getAccount(long accountId) throws IOException {
+        return issueRequest("getAccount",
+                String.format("account=%s", Utils.idToString(accountId)),
+                DEFAULT_READ_TIMEOUT);
+    }
+
+    /**
      * Get the account balance
      *
      * @param       accountId               Account identifier
@@ -227,19 +240,21 @@ public class Request {
      * @param       recipientId             Recipient account identifier
      * @param       chainId                 Transaction chain
      * @param       amount                  Amount to send
-     * @param       fee                     Transaction fee
+     * @param       fee                     Transaction fee (0 to use exchange rate)
+     * @param       exchangeRate            Exchange rate (ignored if fee is non-zero)
      * @param       publicKey               Sender public key
      * @return                              Transaction
      * @throws      IOException             Unable to issue Nxt API request
      */
-    public static Response sendMoney(long recipientId, int chainId, long amount, long fee, byte[] publicKey)
+    public static Response sendMoney(long recipientId, int chainId, long amount, long fee,
+                                            long exchangeRate, byte[] publicKey)
                                             throws IOException {
         return issueRequest("sendMoney",
-                String.format("recipient=%s&chain=%s&amountNQT=%s&feeNQT=%s&publicKey=%s&"
-                                + "deadline=30&broadcast=false",
+                String.format("recipient=%s&chain=%s&amountNQT=%s&feeNQT=%s&feeRateNQTPerFXT=%s&"
+                                + "publicKey=%s&deadline=30&broadcast=false",
                         Utils.idToString(recipientId), Main.chains.get(chainId),
                                 Long.toUnsignedString(amount), Long.toUnsignedString(fee),
-                                Utils.toHexString(publicKey)),
+                                Long.toUnsignedString(exchangeRate), Utils.toHexString(publicKey)),
                 DEFAULT_READ_TIMEOUT);
     }
 
