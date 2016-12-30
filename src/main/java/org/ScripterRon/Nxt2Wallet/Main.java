@@ -403,9 +403,10 @@ public class Main {
             for (int index=0; ; index+=50) {
                 response = Request.getBlockchainTransactions(accountId, chainId, index, index+49);
                 txList = response.getObjectList("transactions");
-                if (txList.isEmpty())
+                if (!txList.isEmpty())
+                    accountTransactions.addAll(Transaction.processTransactions(txList));
+                if (txList.size() < 50)
                     break;
-                accountTransactions.addAll(Transaction.processTransactions(txList));
             }
             response = Request.getUnconfirmedTransactions(accountId, chainId);
             txList = response.getObjectList("unconfirmedTransactions");

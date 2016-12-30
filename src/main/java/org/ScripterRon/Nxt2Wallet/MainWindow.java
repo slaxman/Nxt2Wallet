@@ -100,6 +100,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
     /** Transaction table model */
     private final TransactionTableModel[] tableModel;
 
+    /** Event handler thread */
+    private Thread eventThread = null;
+
     /** Event handler shutdown started */
     private volatile boolean shutdown = false;
 
@@ -314,40 +317,48 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         if (accountId == 0)
             return;
         //
-        // Switch to the new account
+        // Stop the event handler and process pending Swing events
         //
-        try {
-            Main.accountId = accountId;
-            Main.accountRsId = Utils.getAccountRsId(accountId);
-            int i = Main.accounts.indexOf(accountId);
-            if (i >= 0) {
-                Main.passPhrase = Main.secretPhrases.get(i);
-            } else {
-                Main.passPhrase = "";
+        stopEventHandler();
+        SwingUtilities.invokeLater(() -> {
+            //
+            // Switch to the new account
+            //
+            try {
+                int i = Main.accounts.indexOf(accountId);
+                if (i >= 0) {
+                    Main.passPhrase = Main.secretPhrases.get(i);
+                } else {
+                    Main.passPhrase = "";
+                }
+                Main.accountId = accountId;
+                Main.accountRsId = Utils.getAccountRsId(accountId);
+                Main.accountTransactions.clear();
+                Main.unconfirmedTransactions.clear();
+                Main.getAccount();
+                for (TransactionTableModel model : tableModel) {
+                    model.resetTransactions();
+                }
+                StringBuilder sb = new StringBuilder(64);
+                sb.append(Utils.idToString(Main.accountId)).append(" / ").append(Main.accountRsId);
+                if (Main.accountName.length() != 0)
+                    sb.append(" (").append(Main.accountName).append(")");
+                accountField.setText("<html><b>Account:   " + sb.toString() + "</b></html>");
+                updateNodeStatus();
+                startEventHandler();
+            } catch (IOException exc) {
+                Main.log.error("Unable to get initial account information", exc);
+                Main.logException("Unable to get initial account information", exc);
             }
-            Main.accountTransactions.clear();
-            Main.unconfirmedTransactions.clear();
-            Main.getAccount();
-            for (TransactionTableModel model : tableModel) {
-                model.resetTransactions();
-            }
-            StringBuilder sb = new StringBuilder(64);
-            sb.append(Utils.idToString(Main.accountId)).append(" / ").append(Main.accountRsId);
-            if (Main.accountName.length() != 0)
-                sb.append(" (").append(Main.accountName).append(")");
-            accountField.setText("<html><b>Account:   " + sb.toString() + "</b></html>");
-            updateNodeStatus();
-        } catch (IOException exc) {
-            Main.log.error("Unable to get initial account information", exc);
-            Main.logException("Unable to get initial account information", exc);
-        }
+        });
     }
 
     /**
      * Start the Nxt event handler
      */
     private void startEventHandler() {
-        Thread eventThread = new Thread(this, "Nxt Event Handler");
+        shutdown = false;
+        eventThread = new Thread(this, "Nxt Event Handler");
         eventThread.setDaemon(true);
         eventThread.start();
     }
