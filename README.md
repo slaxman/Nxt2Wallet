@@ -12,7 +12,6 @@ I use the Netbeans IDE but any build environment with Maven and the Java compile
 Here are the steps for a manual build.  You will need to install Maven 3 and Java SE Development Kit 8 if you don't already have them.
 
   - Create the executable: mvn clean package    
-  - [Optional] Create the documentation: mvn javadoc:javadoc    
   - [Optional] Copy target/Nxt2Wallet-v.r.m.jar and lib/* to wherever you want to store the executables.   
   - Create a shortcut to start Nxt2Wallet using java.exe for a command window or javaw.exe for GUI only.     
 
@@ -42,7 +41,7 @@ The following configuration options can be specified in Nxt2Wallet.conf.  This f
     Specifies the Nxt2 node host name and defaults to 'localhost'		
 	
   - apiport=port		
-	Specifies the API port of the Nxt2 node and defaults to 27876.
+	Specifies the API port of the Nxt2 node and defaults to 27876.  Use 26876 for testnet.    
     
   - useSSL=boolean      
     Specify 'true' to use HTTPS or 'false' to use HTTP to connect to the NRS node.  The default is 'true'.  HTTP is always used when connected to 'localhost'.
@@ -54,4 +53,4 @@ The following configuration options can be specified in Nxt2Wallet.conf.  This f
     Specify 'true' to accept the server certificate without verifying the trust path or 'false' to verify the certificate trust path before accepting the connection.  The default is 'false'.
     
   - account=id      
-    Specify the Nxt account as either an identifier or a Reed-Solomon string.  This parameter can be repeated to define multiple accounts.  You will be prompted to enter the account if this parameter is not specified.
+    Specify the Nxt account as either an identifier or a Reed-Solomon string.  This parameter can be repeated to define multiple accounts.  You will be prompted to enter the account if this parameter is not specified.  The account must exist before you can use Nxt2Wallet.  An account is created by sending coins or a message to the account from an existing account.    
