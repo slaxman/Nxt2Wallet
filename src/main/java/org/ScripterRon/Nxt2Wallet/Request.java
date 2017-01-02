@@ -152,7 +152,7 @@ public class Request {
     public static Response getBalance(long accountId, int chainId) throws IOException {
         return issueRequest("getBalance",
                 String.format("account=%s&chain=%s",
-                        Utils.idToString(accountId), Main.chains.get(chainId)),
+                        Utils.idToString(accountId), Main.chains.get(chainId).getName()),
                 DEFAULT_READ_TIMEOUT);
     }
 
@@ -180,7 +180,8 @@ public class Request {
                                             int firstIndex, int lastIndex) throws IOException {
         return issueRequest("getBlockchainTransactions",
                 String.format("account=%s&chain=%s&firstIndex=%d&lastIndex=%d",
-                        Utils.idToString(accountId), Main.chains.get(chainId), firstIndex, lastIndex),
+                        Utils.idToString(accountId), Main.chains.get(chainId).getName(),
+                firstIndex, lastIndex),
                 DEFAULT_READ_TIMEOUT);
     }
 
@@ -215,7 +216,7 @@ public class Request {
     public static Response getTransaction(byte[] fullHash, int chainId) throws IOException {
         return issueRequest("getTransaction",
                             String.format("fullHash=%s&chain=%s",
-                                    Utils.toHexString(fullHash), Main.chains.get(chainId)),
+                                    Utils.toHexString(fullHash), Main.chains.get(chainId).getName()),
                             DEFAULT_READ_TIMEOUT);
     }
 
@@ -230,7 +231,7 @@ public class Request {
     public static Response getUnconfirmedTransactions(long accountId, int chainId) throws IOException {
         return issueRequest("getUnconfirmedTransactions",
                             String.format("account=%s&chain=%s",
-                                    Utils.idToString(accountId), Main.chains.get(chainId)),
+                                    Utils.idToString(accountId), Main.chains.get(chainId).getName()),
                             DEFAULT_READ_TIMEOUT);
     }
 
@@ -252,7 +253,7 @@ public class Request {
         return issueRequest("sendMoney",
                 String.format("recipient=%s&chain=%s&amountNQT=%s&feeNQT=%s&feeRateNQTPerFXT=%s&"
                                 + "publicKey=%s&deadline=30&broadcast=false",
-                        Utils.idToString(recipientId), Main.chains.get(chainId),
+                        Utils.idToString(recipientId), Main.chains.get(chainId).getName(),
                                 Long.toUnsignedString(amount), Long.toUnsignedString(fee),
                                 Long.toUnsignedString(exchangeRate), Utils.toHexString(publicKey)),
                 DEFAULT_READ_TIMEOUT);
@@ -331,7 +332,7 @@ public class Request {
                     String errorText = String.format("Error %d returned for %s request: %s",
                                                      errorCode, requestType, errorDesc);
                     Main.log.error(errorText);
-                    throw new IOException(errorText);
+                    throw new NxtException(errorText, errorCode.intValue(), errorDesc);
                 }
             }
             if (Main.log.isDebugEnabled())

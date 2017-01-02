@@ -26,8 +26,9 @@ import java.awt.event.WindowEvent;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -190,8 +191,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         tableModel = new TransactionTableModel[tableCount];
         tabbedPane = new JTabbedPane();
         int index = 0;
-        for (Map.Entry<Integer, String> entry : Main.chains.entrySet()) {
-            tableModel[index] = new TransactionTableModel(columnNames, columnClasses, entry.getKey());
+        for (Chain chain : Main.chains.values()) {
+            tableModel[index] = new TransactionTableModel(columnNames, columnClasses, chain);
             table[index] = new SizedTable(tableModel[index], columnTypes);
             table[index].setRowSorter(new TableRowSorter<>(tableModel[index]));
             table[index].setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -199,8 +200,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             JPanel tablePane = new JPanel(new BorderLayout());
             tablePane.setBackground(Color.WHITE);
             tablePane.add(scrollPane, BorderLayout.CENTER);
-            tabbedPane.addTab(entry.getValue(), tablePane);
-            tableMap.put(entry.getKey(), tableModel[index]);
+            tabbedPane.addTab(chain.getName(), tablePane);
+            tableMap.put(chain.getId(), tableModel[index]);
             index++;
         }
         //
@@ -267,8 +268,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                         JOptionPane.showMessageDialog(this, "No transaction pane is selected",
                                                       "Error", JOptionPane.ERROR_MESSAGE);
                     } else {
-                        int chainId = tableModel[tab].getChainId();
-                        SendCoinsDialog.showDialog(this, chainId);
+                        SendCoinsDialog.showDialog(this, tableModel[tab].getChain());
                     }
                     break;
                 case "view contacts":
@@ -346,9 +346,12 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 accountField.setText("<html><b>Account:   " + sb.toString() + "</b></html>");
                 updateNodeStatus();
                 startEventHandler();
+            } catch (NxtException exc) {
+                Main.log.error("Unable to get initial account information: " + exc.getErrorDescription(), exc);
+                Main.logException("Unable to get initial account information: " + exc.getErrorDescription(), exc);
             } catch (IOException exc) {
-                Main.log.error("Unable to get initial account information", exc);
-                Main.logException("Unable to get initial account information", exc);
+                Main.log.error("I/O error while obtaining initial account information", exc);
+                Main.logException("I/O error while obtaining initial account information", exc);
             }
         });
     }
@@ -386,6 +389,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
     @SuppressWarnings("unchecked")
     @Override
     public void run() {
+        Main.log.debug("Event handler started");
         //
         // Get the initial server status
         //
@@ -399,6 +403,10 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             eventList.add("Transaction.ADDED_CONFIRMED_TRANSACTIONS." + Main.accountRsId);
             eventList.add("Transaction.ADDED_UNCONFIRMED_TRANSACTIONS." + Main.accountRsId);
             Request.eventRegister(eventList, false, false);
+        } catch (NxtException exc) {
+            Main.log.error("Unable to register our events: " + exc.getErrorDescription(), exc);
+            Main.logException("Unable to register our events: " + exc.getErrorDescription(), exc);
+            shutdown = true;
         } catch (IOException exc) {
             Main.log.error("Unable to register our events", exc);
             Main.logException("Unable to register our events", exc);
@@ -474,6 +482,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 Main.log.error("Unable to perform status update", exc);
                 Main.logException("Unable to perform status update", exc);
                 shutdown = true;
+            } catch (NxtException exc) {
+                Main.log.error("Unable to process server event: " + exc.getErrorDescription(), exc);
+                Main.logException("Unable to process server event: " + exc.getErrorDescription(), exc);
             } catch (IOException exc) {
                 Main.log.error("Unable to process server event", exc);
                 Main.logException("Unable to process server event", exc);
@@ -483,6 +494,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 Main.logException("Exception while processing server event", exc);
             }
         }
+        Main.log.debug("Event handler stopped");
     }
 
     /**
@@ -493,11 +505,11 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         StringBuilder sb = new StringBuilder(64);
         sb.append("<html><b>Account balances:   ");
         boolean firstBalance = true;
-        for (Map.Entry<Integer, String> entry : Main.chains.entrySet()) {
+        for (Chain chain : Main.chains.values()) {
             if (!firstBalance)
                 sb.append(", ");
-            sb.append(Utils.nqtToString(Main.accountBalance.get(entry.getKey())))
-                    .append(" ").append(entry.getValue());
+            sb.append(Utils.nqtToString(Main.accountBalance.get(chain.getId()), chain.getDecimals()))
+                    .append(" ").append(chain.getName());
             firstBalance = false;
         }
         sb.append("</b></html>");
@@ -605,8 +617,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         /** Column classes */
         private final Class<?>[] columnClasses;
 
-        /** Chain identifier */
-        private final int chainId;
+        /** Chain */
+        private final Chain chain;
 
         /** Account transactions */
         private final List<Transaction> txList = new LinkedList<>();
@@ -619,26 +631,26 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
          *
          * @param       columnName          Column names
          * @param       columnClasses       Column classes
-         * @param       chainId             Chain identifier
+         * @param       chain               Chain
          */
-        public TransactionTableModel(String[] columnNames, Class<?>[] columnClasses, int chainId) {
+        public TransactionTableModel(String[] columnNames, Class<?>[] columnClasses, Chain chain) {
             super();
             if (columnNames.length != columnClasses.length)
                 throw new IllegalArgumentException("Number of names not same as number of classes");
             this.columnNames = columnNames;
             this.columnClasses = columnClasses;
-            this.chainId = chainId;
+            this.chain = chain;
             //
             // Build the initial transaction list
             //
             Main.accountTransactions.forEach(tx -> {
-                if (tx.getChainId() == chainId) {
+                if (tx.getChainId() == chain.getId()) {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
                 }
             });
             Main.unconfirmedTransactions.forEach(tx -> {
-                if (tx.getChainId() == chainId) {
+                if (tx.getChainId() == chain.getId()) {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
                 }
@@ -646,7 +658,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             //
             // Sort the transaction by descending timestamp
             //
-            Collections.sort(txList, (o1, o2) -> {
+            txList.sort((o1, o2) -> {
                 int c = (o1.getTimestamp().compareTo(o2.getTimestamp()));
                 return (c < 0 ? 1 : (c > 0 ? -1 : 0));
             });
@@ -733,16 +745,20 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                         value = "";
                     break;
                 case 4:                                 // Amount
+                    BigDecimal amount = new BigDecimal(tx.getAmount(), MathContext.DECIMAL128)
+                            .movePointLeft(chain.getDecimals());
                     if (tx.getSenderId() == Main.accountId)
-                        value = -tx.getAmount();
+                        value = amount.negate();
                     else
-                        value = tx.getAmount();
+                        value = amount;
                     break;
                 case 5:                                 // Fee
+                    BigDecimal fee = new BigDecimal(tx.getFee(), MathContext.DECIMAL128)
+                            .movePointLeft(chain.getDecimals());
                     if (tx.getSenderId() == Main.accountId)
-                        value = -tx.getFee();
+                        value = fee.negate();
                     else
-                        value = tx.getFee();
+                        value = fee;
                     break;
                 case 6:                                 // Confirmations
                     int height = tx.getHeight();
@@ -761,10 +777,21 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         }
 
         /**
+         * Get the chain for this table
+         *
+         * @return              Chain
+         */
+        public Chain getChain() {
+            return chain;
+        }
+
+        /**
          * Get the chain identifier for this table
+         *
+         * @return              Chain identifier
          */
         public int getChainId() {
-            return chainId;
+            return chain.getId();
         }
 
         /**
@@ -777,13 +804,13 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             // Build the initial transaction list
             //
             Main.accountTransactions.forEach(tx -> {
-                if (tx.getChainId() == chainId) {
+                if (tx.getChainId() == chain.getId()) {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
                 }
             });
             Main.unconfirmedTransactions.forEach(tx -> {
-                if (tx.getChainId() == chainId) {
+                if (tx.getChainId() == chain.getId()) {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
                 }
@@ -791,7 +818,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             //
             // Sort the transaction by descending timestamp
             //
-            Collections.sort(txList, (o1, o2) -> {
+            txList.sort((o1, o2) -> {
                 int c = (o1.getTimestamp().compareTo(o2.getTimestamp()));
                 return (c < 0 ? 1 : (c > 0 ? -1 : 0));
             });
@@ -807,7 +834,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
          * @param       tx              Transaction
          */
         public void addTransaction(Transaction tx) {
-            if (tx.getChainId() == chainId) {
+            if (tx.getChainId() == chain.getId()) {
                 Transaction listTx = txMap.get(tx.getId());
                 if (listTx != null) {
                     if (listTx.getBlockId() != tx.getBlockId() && tx.getBlockId() != 0) {
@@ -818,7 +845,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 } else {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
-                    Collections.sort(txList, (o1, o2) -> {
+                    txList.sort((o1, o2) -> {
                         int c = (o1.getTimestamp().compareTo(o2.getTimestamp()));
                         return (c < 0 ? 1 : (c > 0 ? -1 : 0));
                     });

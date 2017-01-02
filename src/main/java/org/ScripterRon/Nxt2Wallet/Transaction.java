@@ -123,7 +123,7 @@ public class Transaction {
     }
 
     /**
-     * Create a new wallet transaction
+     * Create a new unsigned transaction
      *
      * @param   transactionBytes            Transaction bytes
      * @throws  BufferUnderflowException    Transaction bytes too short
@@ -163,13 +163,10 @@ public class Transaction {
         this.height = 0;
         this.blockId = 0;
         //
-        // Calculate the transaction identifier
+        // The transaction identifier and full hash are not defined for an unsigned transaction
         //
-        byte[] zeroSignature = Arrays.copyOf(transactionBytes, transactionBytes.length);
-        Arrays.fill(zeroSignature, SIGNATURE_OFFSET, SIGNATURE_OFFSET+64, (byte)0);
-        byte[] signatureHash = Crypto.singleDigest(signature);
-        this.fullHash = Crypto.singleDigest(zeroSignature, signatureHash);
-        this.id = Utils.fullHashToId(this.fullHash);
+        this.id = 0;
+        this.fullHash = new byte[32];
     }
 
     /**

@@ -135,7 +135,7 @@ public class Main {
     public static final Map<Long, Contact> contactsMap = new HashMap<>();
 
     /** Nxt chains */
-    public static final Map<Integer, String> chains = new HashMap<>();
+    public static final Map<Integer, Chain> chains = new HashMap<>();
 
     /** FXT (ARDR) chain identifier */
     public static int fxtChainId;
@@ -338,17 +338,19 @@ public class Main {
             //
             // Get the chains
             //
-            Set<Map.Entry<String, Object>> chainSet = response.getObject("chains").entrySet();
-            chainSet.forEach(entry -> {
-                chains.put(((Long)entry.getValue()).intValue(), entry.getKey());
-                if (entry.getKey().equals("ARDR"))
-                    fxtChainId = ((Long)entry.getValue()).intValue();
+            response.getObject("chainProperties").values().forEach(entry -> {
+                Response chainProperties = new Response((Map<String, Object>)entry);
+                Chain chain = new Chain(chainProperties.getString("name"),
+                                        chainProperties.getInt("id"),
+                                        chainProperties.getInt("decimals"));
+                chains.put(chain.getId(), chain);
+                if (chain.getName().equals("ARDR"))
+                    fxtChainId = chain.getId();
             });
             //
             // Get the transaction types
             //
-            Set<Map.Entry<String, Object>> typeSet = response.getObject("transactionTypes").entrySet();
-            typeSet.forEach(entry -> {
+            response.getObject("transactionTypes").entrySet().forEach(entry -> {
                 int type = Integer.valueOf(entry.getKey());
                 Map<String, Object> subtypes = (Map<String, Object>)((Map<String, Object>)entry.getValue()).get("subtypes");
                 Set<Map.Entry<String, Object>> subtypeSet = subtypes.entrySet();
@@ -379,9 +381,13 @@ public class Main {
             javax.swing.SwingUtilities.invokeLater(() -> {
                 createAndShowGUI();
             });
+        } catch (NxtException exc) {
+            log.error("Unable to get initial account information: " + exc.getErrorDescription(), exc);
+            logException("Unable to get initial account information: " + exc.getErrorDescription(), exc);
+            shutdown();
         } catch (IOException exc) {
-            log.error("Unable to get initial account information", exc);
-            logException("Unable to get initial account information", exc);
+            log.error("I/O error while obtaining initial account information", exc);
+            logException("I/O error while obtaining initial account information", exc);
             shutdown();
         } catch (Exception exc) {
             log.error("Exception while starting account services", exc);

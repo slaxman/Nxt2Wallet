@@ -15,6 +15,8 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import java.math.BigDecimal;
+
 import java.awt.Color;
 import java.awt.Component;
 
@@ -59,7 +61,11 @@ public final class AmountRenderer extends DefaultTableCellRenderer {
         //
         // Convert the amount to a formatted string
         //
-        String text = Utils.nqtToString(((Number)value).longValue());
+        String text;
+        if (value instanceof BigDecimal)
+            text = Utils.nqtToString((BigDecimal)value);
+        else
+            text = Utils.nqtToString(((Number)value).longValue(), 8);
         //
         // Set the foreground color to red if the value is negative
         //
