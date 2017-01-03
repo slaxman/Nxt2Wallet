@@ -246,6 +246,10 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
                         "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
             }
+        } catch (ArithmeticException exc) {
+            JOptionPane.showMessageDialog(this, "Too many decimal digits specified", "Error",
+                                          JOptionPane.ERROR_MESSAGE);
+            return false;
         } catch (NumberFormatException exc) {
             JOptionPane.showMessageDialog(this, "Numeric value is not valid", "Error",
                                           JOptionPane.ERROR_MESSAGE);

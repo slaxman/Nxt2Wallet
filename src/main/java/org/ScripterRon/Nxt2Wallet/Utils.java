@@ -150,17 +150,20 @@ public class Utils {
     /**
      * Convert a decimal string to NQT
      *
-     * @param       value           String to be converted
-     * @param       decimals        Number of decimal places for coin
-     * @return                      Amount expressed in NQT
+     * @param       value                   String to be converted
+     * @param       decimals                Number of decimal places for coin
+     * @return                              Amount expressed in NQT
+     * @throws      ArithmeticException     Fractional data lost
+     * @throws      NumberFormatException   Invalid numeric value
      */
-    public static long stringToNQT(String value, int decimals) throws NumberFormatException {
+    public static long stringToNQT(String value, int decimals)
+                                            throws NumberFormatException, ArithmeticException {
         if (value == null)
             throw new IllegalArgumentException("No string value provided");
         if (value.isEmpty())
             return 0;
         BigDecimal decValue = new BigDecimal(value, MathContext.DECIMAL128);
-        return decValue.movePointRight(decimals).longValue();
+        return decValue.movePointRight(decimals).longValueExact();
     }
 
     /**

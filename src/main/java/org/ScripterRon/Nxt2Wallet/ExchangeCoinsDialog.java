@@ -28,7 +28,6 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -285,6 +284,10 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
                         "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
             }
+        } catch (ArithmeticException exc) {
+            JOptionPane.showMessageDialog(this, "Too many decimal digits specified", "Error",
+                                          JOptionPane.ERROR_MESSAGE);
+            return false;
         } catch (NumberFormatException exc) {
             JOptionPane.showMessageDialog(this, "Numeric value is not valid", "Error",
                                           JOptionPane.ERROR_MESSAGE);
