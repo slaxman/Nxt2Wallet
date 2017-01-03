@@ -53,6 +53,9 @@ public final class SizedTable extends JTable {
     /** Uniform Resource Locator */
     public static final int URI = 7;
 
+    /** Chain name */
+    public static final int CHAIN = 8;
+
     /**
      * Create a new sized table
      *
@@ -101,6 +104,9 @@ public final class SizedTable extends JTable {
                     break;
                 case ADDRESS:                                       // 24 characters
                     value = "0123456789012345678901234";
+                    break;
+                case CHAIN:                                         // 8 characters
+                    value = "01234567";
                     break;
                 case NAME:                                          // 32 characters
                     value = "01234567890123456789012345678901";

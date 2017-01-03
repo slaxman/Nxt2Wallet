@@ -67,12 +67,12 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
     /** Transaction table column classes */
     private static final Class<?>[] columnClasses = {
         Date.class, String.class, String.class, String.class,
-        Long.class, Long.class, String.class};
+        Number.class, Number.class, String.class};
 
     /** Transaction table column types */
     private static final int[] columnTypes = {
-        SizedTable.DATE, SizedTable.ADDRESS, SizedTable.TYPE, SizedTable.ADDRESS, SizedTable.AMOUNT,
-        SizedTable.AMOUNT, SizedTable.STATUS};
+        SizedTable.DATE, SizedTable.ADDRESS, SizedTable.TYPE, SizedTable.ADDRESS,
+        SizedTable.AMOUNT, SizedTable.AMOUNT, SizedTable.STATUS};
 
     /** Main window is minimized */
     private boolean windowMinimized = false;
@@ -106,6 +106,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
 
     /** Event handler shutdown started */
     private volatile boolean shutdown = false;
+
+    /** Event handler token */
+    private long eventToken;
 
     /**
      * Create the application window
@@ -208,6 +211,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         // Create the button pane
         //
         ButtonPane buttonPane = new ButtonPane(this, 15, new String[] {"Send money", "send money"},
+                                                         new String[] {"View exchange", "view exchange"},
                                                          new String[] {"View contacts", "view contacts"});
         buttonPane.setOpaque(true);
         buttonPane.setBackground(Color.WHITE);
@@ -249,8 +253,10 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         // "exit"               - Exit the program
         // "send nxt"           - Send Nxt
         // "view contacts"      - View contacts
+        // "view exchange"      - View exchange orders
         //
         try {
+            int tab;
             String action = ae.getActionCommand();
             switch (action) {
                 case "about":
@@ -263,7 +269,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                     exitProgram();
                     break;
                 case "send money":
-                    int tab = tabbedPane.getSelectedIndex();
+                    tab = tabbedPane.getSelectedIndex();
                     if (tab < 0) {
                         JOptionPane.showMessageDialog(this, "No transaction pane is selected",
                                                       "Error", JOptionPane.ERROR_MESSAGE);
@@ -275,6 +281,15 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                     ContactsDialog.showDialog(this);
                     for (TransactionTableModel model : tableModel)
                         model.fireTableDataChanged();
+                    break;
+                case "view exchange":
+                    tab = tabbedPane.getSelectedIndex();
+                    if (tab < 0) {
+                        JOptionPane.showMessageDialog(this, "No transaction pane is selected",
+                                                      "Error", JOptionPane.ERROR_MESSAGE);
+                    } else {
+                        viewExchange(tableModel[tab].getChain());
+                    }
                     break;
             }
         } catch (Exception exc) {
@@ -304,6 +319,27 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         // All done
         //
         Main.shutdown();
+    }
+
+    /**
+     * View exchange orders
+     *
+     * @param   chain           Current chain
+     */
+    private void viewExchange(Chain chain) {
+        try {
+            Response response = Request.getCoinExchangeOrders(chain.getId());
+            ExchangeDialog.showDialog(this, chain, response.getObjectList("orders"));
+        } catch (NxtException exc) {
+            Main.log.error("Unable to get exchange orders: " + exc.getErrorDescription(), exc);
+            Main.logException("Unable to get exchange orders: " + exc.getErrorDescription(), exc);
+        } catch (IOException exc) {
+            Main.log.error("I/O error while getting exchange orders", exc);
+            Main.logException("I/O error while getting exchange orders", exc);
+        } catch (Exception exc) {
+            Main.log.error("Exception while viewing exchange orders", exc);
+            Main.logException("Exception while viewing exchange orders", exc);
+        }
     }
 
     /**
@@ -376,7 +412,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         //
         try {
             List<String> eventList = new ArrayList<>();
-            Request.eventRegister(eventList, false, true);
+            Request.eventRegister(eventList, eventToken, false, true);
         } catch (IOException exc) {
             Main.log.error("Unable to cancel event listener", exc);
             Main.logException("Unable to cancel event listener", exc);
@@ -402,7 +438,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             eventList.add("Block.BLOCK_POPPED");
             eventList.add("Transaction.ADDED_CONFIRMED_TRANSACTIONS." + Main.accountRsId);
             eventList.add("Transaction.ADDED_UNCONFIRMED_TRANSACTIONS." + Main.accountRsId);
-            Request.eventRegister(eventList, false, false);
+            eventList.add("Transaction.REMOVED_UNCONFIRMED_TRANSACTIONS." + Main.accountRsId);
+            Response eventResponse = Request.eventRegister(eventList, 0, false, false);
+            eventToken = eventResponse.getLong("token");
         } catch (NxtException exc) {
             Main.log.error("Unable to register our events: " + exc.getErrorDescription(), exc);
             Main.logException("Unable to register our events: " + exc.getErrorDescription(), exc);
@@ -424,7 +462,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 //
                 // Wait for an event
                 //
-                List<Event> eventList = Request.eventWait(60);
+                List<Event> eventList = Request.eventWait(eventToken, 60);
                 if (shutdown)
                     break;
                 if (eventList.isEmpty())
@@ -457,6 +495,20 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                                     final Transaction addedTx = new Transaction(response);
                                     SwingUtilities.invokeAndWait(() -> {
                                         tableMap.get(txChainId).addTransaction(addedTx);
+                                    });
+                                }
+                            }
+                            break;
+                        case "Transaction.REMOVED_UNCONFIRMED_TRANSACTIONS":
+                            for (String eventId : event.getIds()) {
+                                String[] eventParts = eventId.split(":");
+                                if (eventParts.length != 2) {
+                                    Main.log.error("Invalid transaction event id: " + eventId);
+                                } else {
+                                    final int txChainId = Integer.valueOf(eventParts[0]);
+                                    final byte[] fullHash = Utils.parseHexString(eventParts[1]);
+                                    SwingUtilities.invokeAndWait(() -> {
+                                        tableMap.get(txChainId).removeUnconfirmedTransaction(fullHash);
                                     });
                                 }
                             }
@@ -881,6 +933,21 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 }
             });
             fireTableDataChanged();
+        }
+
+        /**
+         * Remove unconfirmed transaction
+         *
+         * @param       fullHash        Transaction hash
+         */
+        public void removeUnconfirmedTransaction(byte[] fullHash) {
+            long txId = Utils.fullHashToId(fullHash);
+            Transaction tx = txMap.get(txId);
+            if (tx != null && tx.getBlockId() == 0) {
+                txList.remove(tx);
+                txMap.remove(txId);
+                fireTableDataChanged();
+            }
         }
     }
 }
