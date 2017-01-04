@@ -22,6 +22,9 @@ import java.io.IOException;
  */
 public class NxtException extends IOException {
 
+    /** Nxt API */
+    private final String requestType;
+
     /** Nxt error code */
     private final int errorCode;
 
@@ -32,13 +35,24 @@ public class NxtException extends IOException {
      * Creates a new exception with a detail message
      *
      * @param       msg                 Detail message
+     * @param       requestType         NXT API
      * @param       errorCode           Nxt error code
      * @param       errorDescription    Nxt error description
      */
-    public NxtException(String msg, int errorCode, String errorDescription) {
+    public NxtException(String msg, String requestType, int errorCode, String errorDescription) {
         super(msg);
+        this.requestType = requestType;
         this.errorCode = errorCode;
         this.errorDescription = errorDescription;
+    }
+
+    /**
+     * Return the Nxt API
+     *
+     * @return                      Nxt API request type
+     */
+    public String getRequestType() {
+        return requestType;
     }
 
     /**

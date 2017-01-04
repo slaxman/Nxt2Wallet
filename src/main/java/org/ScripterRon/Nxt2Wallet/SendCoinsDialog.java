@@ -313,12 +313,9 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         } catch (KeyException exc) {
             Main.log.error("Unable to get public key from secret phrase", exc);
             Main.logException("Unable to get public key from secret phrase", exc);
-        } catch (NxtException exc) {
-            Main.log.error("Unable to send coins: " + exc.getErrorDescription(), exc);
-            Main.logException("Unable to send coins: " + exc.getErrorDescription(), exc);
         } catch (IOException exc) {
-            Main.log.error("I/O error while sending coins", exc);
-            Main.logException("I/O error sending coins", exc);
+            Main.log.error("Unable to send coins", exc);
+            Main.logException("Unable to send coins", exc);
         } catch (Exception exc) {
             Main.log.error("Exception while sending coins", exc);
             Main.logException("Exception while sending coins", exc);

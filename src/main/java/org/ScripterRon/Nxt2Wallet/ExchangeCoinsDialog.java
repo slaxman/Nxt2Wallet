@@ -324,9 +324,12 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
                     exchangeAmount, exchangePrice, exchangeFee, exchangeRate, publicKey);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Transaction tx = new Transaction(txBytes);
+            OrderIssueAttachment attachment = new OrderIssueAttachment(txBytes);
             if (exchangeFee == 0)
                 exchangeFee = tx.getFee();
-            if (tx.getFee() != exchangeFee || tx.getSenderId() != Main.accountId) {
+            if (tx.getFee() != exchangeFee || tx.getSenderId() != Main.accountId ||
+                    attachment.getChain() != chain || attachment.getExchangeChain() != exchangeChain ||
+                    attachment.getQuantity() != exchangeAmount || attachment.getPrice() != exchangePrice) {
                 JOptionPane.showMessageDialog(this, "Transaction returned by Nxt node is not valid",
                                               "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
@@ -348,12 +351,9 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
         } catch (KeyException exc) {
             Main.log.error("Unable to get public key from secret phrase", exc);
             Main.logException("Unable to get public key from secret phrase", exc);
-        } catch (NxtException exc) {
-            Main.log.error("Unable to exchange coins: " + exc.getErrorDescription(), exc);
-            Main.logException("Unable to exchange coins: " + exc.getErrorDescription(), exc);
         } catch (IOException exc) {
-            Main.log.error("I/O error while exchanging coins", exc);
-            Main.logException("I/O error exchanging coins", exc);
+            Main.log.error("Unable to exchange coins", exc);
+            Main.logException("Unable to exchange coins", exc);
         } catch (Exception exc) {
             Main.log.error("Exception while exchanging coins", exc);
             Main.logException("Exception while exchanging coins", exc);

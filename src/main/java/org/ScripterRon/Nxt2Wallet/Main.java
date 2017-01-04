@@ -381,13 +381,9 @@ public class Main {
             javax.swing.SwingUtilities.invokeLater(() -> {
                 createAndShowGUI();
             });
-        } catch (NxtException exc) {
-            log.error("Unable to get initial account information: " + exc.getErrorDescription(), exc);
-            logException("Unable to get initial account information: " + exc.getErrorDescription(), exc);
-            shutdown();
         } catch (IOException exc) {
-            log.error("I/O error while obtaining initial account information", exc);
-            logException("I/O error while obtaining initial account information", exc);
+            log.error("Unable to get initial account information", exc);
+            logException("Unable to get initial account information", exc);
             shutdown();
         } catch (Exception exc) {
             log.error("Exception while starting account services", exc);
@@ -584,22 +580,29 @@ public class Main {
             //
             string.append("<html><b>");
             string.append(text);
-            string.append("</b><br><br>");
+            string.append("</b><br>");
             //
             // Display the exception object
             //
-            string.append(exc.toString());
-            string.append("<br>");
+            string.append("<b>");
+            if (exc instanceof NxtException) {
+                string.append(exc.getMessage());
+            } else {
+                string.append(exc.toString());
+            }
+            string.append("</b><br><br>");
             //
             // Display the stack trace
             //
-            StackTraceElement[] trace = exc.getStackTrace();
-            int count = 0;
-            for (StackTraceElement elem : trace) {
-                string.append(elem.toString());
-                string.append("<br>");
-                if (++count == 25)
-                    break;
+            if (!(exc instanceof NxtException)) {
+                StackTraceElement[] trace = exc.getStackTrace();
+                int count = 0;
+                for (StackTraceElement elem : trace) {
+                    string.append(elem.toString());
+                    string.append("<br>");
+                    if (++count == 25)
+                        break;
+                }
             }
             string.append("</html>");
             JOptionPane.showMessageDialog(mainWindow, string, "Error", JOptionPane.ERROR_MESSAGE);

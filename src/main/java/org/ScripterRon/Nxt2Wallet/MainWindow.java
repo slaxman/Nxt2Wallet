@@ -330,12 +330,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         try {
             Response response = Request.getCoinExchangeOrders(chain.getId());
             ExchangeDialog.showDialog(this, chain, response.getObjectList("orders"));
-        } catch (NxtException exc) {
-            Main.log.error("Unable to get exchange orders: " + exc.getErrorDescription(), exc);
-            Main.logException("Unable to get exchange orders: " + exc.getErrorDescription(), exc);
         } catch (IOException exc) {
-            Main.log.error("I/O error while getting exchange orders", exc);
-            Main.logException("I/O error while getting exchange orders", exc);
+            Main.log.error("Unable to get exchange orders", exc);
+            Main.logException("Unable to get exchange orders", exc);
         } catch (Exception exc) {
             Main.log.error("Exception while viewing exchange orders", exc);
             Main.logException("Exception while viewing exchange orders", exc);
@@ -382,12 +379,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 accountField.setText("<html><b>Account:   " + sb.toString() + "</b></html>");
                 updateNodeStatus();
                 startEventHandler();
-            } catch (NxtException exc) {
-                Main.log.error("Unable to get initial account information: " + exc.getErrorDescription(), exc);
-                Main.logException("Unable to get initial account information: " + exc.getErrorDescription(), exc);
             } catch (IOException exc) {
-                Main.log.error("I/O error while obtaining initial account information", exc);
-                Main.logException("I/O error while obtaining initial account information", exc);
+                Main.log.error("Unable to get initial account information", exc);
+                Main.logException("Unable to get initial account information", exc);
             }
         });
     }
@@ -441,10 +435,6 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             eventList.add("Transaction.REMOVED_UNCONFIRMED_TRANSACTIONS." + Main.accountRsId);
             Response eventResponse = Request.eventRegister(eventList, 0, false, false);
             eventToken = eventResponse.getLong("token");
-        } catch (NxtException exc) {
-            Main.log.error("Unable to register our events: " + exc.getErrorDescription(), exc);
-            Main.logException("Unable to register our events: " + exc.getErrorDescription(), exc);
-            shutdown = true;
         } catch (IOException exc) {
             Main.log.error("Unable to register our events", exc);
             Main.logException("Unable to register our events", exc);
@@ -534,9 +524,6 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 Main.log.error("Unable to perform status update", exc);
                 Main.logException("Unable to perform status update", exc);
                 shutdown = true;
-            } catch (NxtException exc) {
-                Main.log.error("Unable to process server event: " + exc.getErrorDescription(), exc);
-                Main.logException("Unable to process server event: " + exc.getErrorDescription(), exc);
             } catch (IOException exc) {
                 Main.log.error("Unable to process server event", exc);
                 Main.logException("Unable to process server event", exc);

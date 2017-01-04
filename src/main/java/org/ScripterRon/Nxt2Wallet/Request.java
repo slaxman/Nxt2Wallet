@@ -374,7 +374,7 @@ public class Request {
                     String errorText = String.format("Error %d returned for %s request: %s",
                                                      errorCode, requestType, errorDesc);
                     Main.log.error(errorText);
-                    throw new NxtException(errorText, errorCode.intValue(), errorDesc);
+                    throw new NxtException(errorText, requestType, errorCode.intValue(), errorDesc);
                 }
             }
             if (Main.log.isDebugEnabled())
@@ -385,6 +385,8 @@ public class Request {
                                              requestType, exc.getErrorOffset(), exc.getMessage());
             Main.log.error(errorText);
             throw new IOException(errorText);
+        } catch (NxtException exc) {
+            throw exc;
         } catch (IOException exc) {
             String errorText = String.format("I/O error on %s request", requestType);
             Main.log.error(errorText, exc);

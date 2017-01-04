@@ -29,6 +29,9 @@ import java.util.Map;
  */
 public class Transaction {
 
+    /** Transaction length */
+    public static final int BASE_LENGTH = 149;
+    
     /** Signature offset in the transaction bytes */
     public static final int SIGNATURE_OFFSET = 69;
 
@@ -89,22 +92,26 @@ public class Transaction {
      * @throws  NumberFormatException   Invalid numeric value
      */
     public Transaction(Response response) throws NumberFormatException {
-        this.version = response.getByte("version");
-        this.id = response.getLong("transaction");
-        this.fullHash = Utils.parseHexString(response.getString("fullHash"));
-        this.amount = response.getLong("amountNQT");
-        this.fee = response.getLong("feeNQT");
-        this.timestamp = new Date((response.getLong("timestamp")) * 1000L + Main.epochBeginning);
-        this.senderId = response.getLong("sender");
-        this.recipientId = response.getLong("recipient");
-        this.chainId = response.getInt("chain");
+        version = response.getByte("version");
+        fullHash = Utils.parseHexString(response.getString("fullHash"));
+        if (fullHash.length > 0) {
+            id = Utils.fullHashToId(fullHash);
+        } else {
+            id = 0;
+        }
+        amount = response.getLong("amountNQT");
+        fee = response.getLong("feeNQT");
+        timestamp = new Date((response.getLong("timestamp")) * 1000L + Main.epochBeginning);
+        senderId = response.getLong("sender");
+        recipientId = response.getLong("recipient");
+        chainId = response.getInt("chain");
         int txHeight = response.getInt("height");
         if (txHeight == 0 || txHeight == Integer.MAX_VALUE) {
-            this.height = 0;
-            this.blockId = 0;
+            height = 0;
+            blockId = 0;
         } else {
-            this.height = txHeight;
-            this.blockId = response.getLong("block");
+            height = txHeight;
+            blockId = response.getLong("block");
         }
         //
         // Get the transaction type
@@ -113,12 +120,12 @@ public class Transaction {
         if (typeMap != null) {
             String subtype = typeMap.get(response.getInt("subtype"));
             if (subtype != null) {
-                this.transactionType = subtype;
+                transactionType = subtype;
             } else {
-                this.transactionType = "Unknown";
+                transactionType = "Unknown";
             }
         } else {
-            this.transactionType = "Unknown";
+            transactionType = "Unknown";
         }
     }
 
@@ -132,18 +139,18 @@ public class Transaction {
     public Transaction(byte[] transactionBytes) throws BufferUnderflowException, NumberFormatException {
         ByteBuffer buffer = ByteBuffer.wrap(transactionBytes);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
-        this.chainId = buffer.getInt();
+        chainId = buffer.getInt();
         int type = buffer.get();
         int subtype = buffer.get();
-        this.version = buffer.get();
-        this.timestamp = new Date(((long)buffer.getInt() * 1000L) + Main.epochBeginning);
+        version = buffer.get();
+        timestamp = new Date(((long)buffer.getInt() * 1000L) + Main.epochBeginning);
         buffer.position(buffer.position() + 2);     // Skip deadline
         byte[] publicKey = new byte[32];
         buffer.get(publicKey);
-        this.senderId = Utils.getAccountId(publicKey);
-        this.recipientId = buffer.getLong();
-        this.amount = buffer.getLong();
-        this.fee = buffer.getLong();
+        senderId = Utils.getAccountId(publicKey);
+        recipientId = buffer.getLong();
+        amount = buffer.getLong();
+        fee = buffer.getLong();
         byte[] signature = new byte[64];
         buffer.get(signature);
         //
@@ -153,20 +160,21 @@ public class Transaction {
         if (typeMap != null) {
             String string = typeMap.get(subtype);
             if (string != null) {
-                this.transactionType = string;
+                transactionType = string;
             } else {
-                this.transactionType = "Unknown";
+                transactionType = "Unknown";
             }
         } else {
-            this.transactionType = "Unknown";
+            transactionType = "Unknown";
         }
-        this.height = 0;
-        this.blockId = 0;
         //
-        // The transaction identifier and full hash are not defined for an unsigned transaction
+        // Transaction identifier, full hash, block identifier and block height
+        // are not defined for an unsigned transaction
         //
-        this.id = 0;
-        this.fullHash = new byte[32];
+        height = 0;
+        blockId = 0;
+        id = 0;
+        fullHash = new byte[0];
     }
 
     /**
