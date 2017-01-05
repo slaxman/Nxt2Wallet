@@ -125,18 +125,18 @@ public class Request {
     public static List<Event> eventWait(long token, int timeout) throws IOException {
         List<Event> events = new ArrayList<>();
         Response response = issueRequest("eventWait",
-                                         String.format("token=%d&timeout=%d", token, timeout),
-                                         (timeout+5)*1000);
+                String.format("token=%d&timeout=%d", token, timeout),
+                (timeout+5)*1000);
         List<Map<String, Object>> eventList = response.getObjectList("events");
         eventList.forEach(resp -> events.add(new Event(new Response(resp))));
         return events;
     }
 
     /**
-     * Exchange coins
+     * Create a transaction to exchange coins and return the unsigned transaction
      *
-     * @param       chainId                 Chain identifier
-     * @param       exchangeId              Exchange identifier
+     * @param       chain                   Chain
+     * @param       exchangeChain           Exchange chain
      * @param       amount                  Exchange amount
      * @param       price                   Exchange price
      * @param       fee                     Transaction fee
@@ -145,12 +145,12 @@ public class Request {
      * @return                              Generated transaction
      * @throws      IOException             Unable to issue Nxt API request
      */
-    public static Response exchangeCoins(int chainId, int exchangeId, long amount, long price,
+    public static Response exchangeCoins(Chain chain, Chain exchangeChain, long amount, long price,
                     long fee, long rate, byte[] publicKey) throws IOException {
         return issueRequest("exchangeCoins",
                 String.format("chain=%s&exchange=%s&amountNQT=%s&priceNQT=%s&feeNQT=%s&"
-                        + "feeRateNQTPerFXT=%s&publicKey=%s&deadline=30&broadcast=false",
-                        Main.chains.get(chainId).getName(), Main.chains.get(exchangeId).getName(),
+                            + "feeRateNQTPerFXT=%s&publicKey=%s&deadline=30&broadcast=false",
+                        chain.getName(), exchangeChain.getName(),
                         Long.toUnsignedString(amount), Long.toUnsignedString(price),
                         Long.toUnsignedString(fee), Long.toUnsignedString(rate),
                         Utils.toHexString(publicKey)),
@@ -174,14 +174,14 @@ public class Request {
      * Get the account balance
      *
      * @param       accountId               Account identifier
-     * @param       chainId                 Chain identifier
+     * @param       chain                   Chain
      * @return                              Account balance
      * @throws      IOException             Unable to issue Nxt API request
      */
-    public static Response getBalance(long accountId, int chainId) throws IOException {
+    public static Response getBalance(long accountId, Chain chain) throws IOException {
         return issueRequest("getBalance",
                 String.format("account=%s&chain=%s",
-                        Utils.idToString(accountId), Main.chains.get(chainId).getName()),
+                        Utils.idToString(accountId), chain.getName()),
                 DEFAULT_READ_TIMEOUT);
     }
 
@@ -199,17 +199,17 @@ public class Request {
      * Get the blockchain transactions
      *
      * @param       accountId               Account identifier
-     * @param       chainId                 Chain identifier
+     * @param       chain                   Chain
      * @param       firstIndex              Index of first transaction to return
      * @param       lastIndex               Index of last transaction to return
      * @return                              Account transactions
      * @throws      IOException             Unable to issue Nxt API request
      */
-    public static Response getBlockchainTransactions(long accountId, int chainId,
+    public static Response getBlockchainTransactions(long accountId, Chain chain,
                                             int firstIndex, int lastIndex) throws IOException {
         return issueRequest("getBlockchainTransactions",
                 String.format("account=%s&chain=%s&firstIndex=%d&lastIndex=%d",
-                        Utils.idToString(accountId), Main.chains.get(chainId).getName(),
+                        Utils.idToString(accountId), chain.getName(),
                 firstIndex, lastIndex),
                 DEFAULT_READ_TIMEOUT);
     }
@@ -227,13 +227,13 @@ public class Request {
     /**
      * Get coin exchange orders
      *
-     * @param       chainId                 Exchange orders for this chain
+     * @param       chain                   Exchange orders for this chain
      * @return                              Exchange orders
      * @throws      IOException             Unable to issue Nxt API request
      */
-    public static Response getCoinExchangeOrders(int chainId) throws IOException {
+    public static Response getCoinExchangeOrders(Chain chain) throws IOException {
         return issueRequest("getCoinExchangeOrders",
-                String.format("exchange=%s", Main.chains.get(chainId).getName()),
+                String.format("exchange=%s", chain.getName()),
                 DEFAULT_READ_TIMEOUT);
     }
 
@@ -248,32 +248,32 @@ public class Request {
     }
 
     /**
-     * Get a transactions
+     * Get a transaction
      *
      * @param       fullHash                Transaction full hash
-     * @param       chainId                 Transaction chain
+     * @param       chain                   Transaction chain
      * @return                              Transaction
      * @throws      IOException             Unable to issue Nxt API request
      */
-    public static Response getTransaction(byte[] fullHash, int chainId) throws IOException {
+    public static Response getTransaction(byte[] fullHash, Chain chain) throws IOException {
         return issueRequest("getTransaction",
                             String.format("fullHash=%s&chain=%s",
-                                    Utils.toHexString(fullHash), Main.chains.get(chainId).getName()),
+                                    Utils.toHexString(fullHash), chain.getName()),
                             DEFAULT_READ_TIMEOUT);
     }
 
     /**
-     * Get the unconfirmed transactions
+     * Get the unconfirmed transactions for an account
      *
      * @param       accountId               Account identifier
-     * @param       chainId                 Transaction chain
+     * @param       chain                   Transaction chain
      * @return                              Transaction
      * @throws      IOException             Unable to issue Nxt API request
      */
-    public static Response getUnconfirmedTransactions(long accountId, int chainId) throws IOException {
+    public static Response getUnconfirmedTransactions(long accountId, Chain chain) throws IOException {
         return issueRequest("getUnconfirmedTransactions",
                             String.format("account=%s&chain=%s",
-                                    Utils.idToString(accountId), Main.chains.get(chainId).getName()),
+                                    Utils.idToString(accountId), chain.getName()),
                             DEFAULT_READ_TIMEOUT);
     }
 
@@ -281,7 +281,7 @@ public class Request {
      * Create a transaction to send money and return the unsigned transaction
      *
      * @param       recipientId             Recipient account identifier
-     * @param       chainId                 Transaction chain
+     * @param       chain                   Transaction chain
      * @param       amount                  Amount to send
      * @param       fee                     Transaction fee (0 to use exchange rate)
      * @param       exchangeRate            Exchange rate (ignored if fee is non-zero)
@@ -289,13 +289,13 @@ public class Request {
      * @return                              Transaction
      * @throws      IOException             Unable to issue Nxt API request
      */
-    public static Response sendMoney(long recipientId, int chainId, long amount, long fee,
+    public static Response sendMoney(long recipientId, Chain chain, long amount, long fee,
                                             long exchangeRate, byte[] publicKey)
                                             throws IOException {
         return issueRequest("sendMoney",
                 String.format("recipient=%s&chain=%s&amountNQT=%s&feeNQT=%s&feeRateNQTPerFXT=%s&"
                                 + "publicKey=%s&deadline=30&broadcast=false",
-                        Utils.idToString(recipientId), Main.chains.get(chainId).getName(),
+                        Utils.idToString(recipientId), chain.getName(),
                                 Long.toUnsignedString(amount), Long.toUnsignedString(fee),
                                 Long.toUnsignedString(exchangeRate), Utils.toHexString(publicKey)),
                 DEFAULT_READ_TIMEOUT);

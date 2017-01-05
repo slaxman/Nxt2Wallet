@@ -328,7 +328,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
      */
     private void viewExchange(Chain chain) {
         try {
-            Response response = Request.getCoinExchangeOrders(chain.getId());
+            Response response = Request.getCoinExchangeOrders(chain);
             ExchangeDialog.showDialog(this, chain, response.getObjectList("orders"));
         } catch (IOException exc) {
             Main.log.error("Unable to get exchange orders", exc);
@@ -479,12 +479,12 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                                 if (eventParts.length != 2) {
                                     Main.log.error("Invalid transaction event id: " + eventId);
                                 } else {
-                                    final int txChainId = Integer.valueOf(eventParts[0]);
+                                    final Chain txChain = Main.chains.get(Integer.valueOf(eventParts[0]));
                                     byte[] fullHash = Utils.parseHexString(eventParts[1]);
-                                    response = Request.getTransaction(fullHash, txChainId);
+                                    response = Request.getTransaction(fullHash, txChain);
                                     final Transaction addedTx = new Transaction(response);
                                     SwingUtilities.invokeAndWait(() -> {
-                                        tableMap.get(txChainId).addTransaction(addedTx);
+                                        tableMap.get(txChain.getId()).addTransaction(addedTx);
                                     });
                                 }
                             }
@@ -515,9 +515,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 //
                 // Update the account balances
                 //
-                for (int chainId : Main.chains.keySet()) {
-                    response = Request.getBalance(Main.accountId, chainId);
-                    Main.accountBalance.put(chainId, response.getLong("unconfirmedBalanceNQT"));
+                for (Chain chain : Main.chains.values()) {
+                    response = Request.getBalance(Main.accountId, chain);
+                    Main.accountBalance.put(chain.getId(), response.getLong("unconfirmedBalanceNQT"));
                 }
                 SwingUtilities.invokeLater(() -> updateNodeStatus());
             } catch (InterruptedException | InvocationTargetException exc) {
@@ -923,14 +923,16 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         }
 
         /**
-         * Remove unconfirmed transaction
+         * Remove unconfirmed child block transactions.  This is necessary because
+         * the bundler will create multiple child block transactions as new child
+         * transactions are received.
          *
          * @param       fullHash        Transaction hash
          */
         public void removeUnconfirmedTransaction(byte[] fullHash) {
             long txId = Utils.fullHashToId(fullHash);
             Transaction tx = txMap.get(txId);
-            if (tx != null && tx.getBlockId() == 0) {
+            if (tx != null && tx.getBlockId() == 0 && tx.getType() == -1) {
                 txList.remove(tx);
                 txMap.remove(txId);
                 fireTableDataChanged();

@@ -400,23 +400,23 @@ public class Main {
     public static void getAccount() throws IOException {
         Response response = Request.getAccount(accountId);
         accountName = response.getString("name");
-        for (int chainId : chains.keySet()) {
+        for (Chain chain : chains.values()) {
             List<Map<String, Object>> txList;
             for (int index=0; ; index+=50) {
-                response = Request.getBlockchainTransactions(accountId, chainId, index, index+49);
+                response = Request.getBlockchainTransactions(accountId, chain, index, index+49);
                 txList = response.getObjectList("transactions");
                 if (!txList.isEmpty())
                     accountTransactions.addAll(Transaction.processTransactions(txList));
                 if (txList.size() < 50)
                     break;
             }
-            response = Request.getUnconfirmedTransactions(accountId, chainId);
+            response = Request.getUnconfirmedTransactions(accountId, chain);
             txList = response.getObjectList("unconfirmedTransactions");
             if (!txList.isEmpty()) {
                 unconfirmedTransactions.addAll(Transaction.processTransactions(txList));
             }
-            response = Request.getBalance(accountId, chainId);
-            accountBalance.put(chainId, response.getLong("unconfirmedBalanceNQT"));
+            response = Request.getBalance(accountId, chain);
+            accountBalance.put(chain.getId(), response.getLong("unconfirmedBalanceNQT"));
         }
     }
 
@@ -619,52 +619,5 @@ public class Main {
                 log.error("Unable to log exception during program initialization");
             }
         }
-    }
-
-    /**
-     * Dumps a byte array to the log
-     *
-     * @param       text        Text message
-     * @param       data        Byte array
-     */
-    public static void dumpData(String text, byte[] data) {
-        dumpData(text, data, 0, data.length);
-    }
-
-    /**
-     * Dumps a byte array to the log
-     *
-     * @param       text        Text message
-     * @param       data        Byte array
-     * @param       length      Length to dump
-     */
-    public static void dumpData(String text, byte[] data, int length) {
-        dumpData(text, data, 0, length);
-    }
-
-    /**
-     * Dump a byte array to the log
-     *
-     * @param       text        Text message
-     * @param       data        Byte array
-     * @param       offset      Offset into array
-     * @param       length      Data length
-     */
-    public static void dumpData(String text, byte[] data, int offset, int length) {
-        StringBuilder outString = new StringBuilder(512);
-        outString.append(text);
-        outString.append("\n");
-        for (int i=0; i<length; i++) {
-            if (i%32 == 0)
-                outString.append(String.format(" %14X  ", i));
-            else if (i%4 == 0)
-                outString.append(" ");
-            outString.append(String.format("%02X", data[offset+i]));
-            if (i%32 == 31)
-                outString.append("\n");
-        }
-        if (length%32 != 0)
-            outString.append("\n");
-        log.info(outString.toString());
     }
 }

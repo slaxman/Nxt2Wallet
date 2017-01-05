@@ -320,7 +320,7 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
         boolean broadcasted = false;
         try {
             byte[] publicKey = Crypto.getPublicKey(secretPhrase);
-            Response response = Request.exchangeCoins(chain.getId(), exchangeChain.getId(),
+            Response response = Request.exchangeCoins(chain, exchangeChain,
                     exchangeAmount, exchangePrice, exchangeFee, exchangeRate, publicKey);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Transaction tx = new Transaction(txBytes);

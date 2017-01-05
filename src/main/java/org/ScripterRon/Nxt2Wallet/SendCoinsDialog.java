@@ -286,7 +286,7 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         boolean broadcasted = false;
         try {
             byte[] publicKey = Crypto.getPublicKey(secretPhrase);
-            Response response = Request.sendMoney(sendAddress, chain.getId(),
+            Response response = Request.sendMoney(sendAddress, chain,
                     sendAmount, sendFee, sendRate, publicKey);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Transaction tx = new Transaction(txBytes);

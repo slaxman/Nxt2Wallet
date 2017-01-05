@@ -25,9 +25,9 @@ import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 
 /**
- * AmountRenderer is a cell renderer for use with a JTable column. It formats
- * NXT amounts with a minimum of 4 decimal digits.  Negative values will be
- * displayed in red while positive values will be displayed in black.
+ * AmountRenderer is a cell renderer for use with a JTable column.
+ * Negative values will be displayed in red while positive values
+ * will be displayed in black.
  */
 public final class AmountRenderer extends DefaultTableCellRenderer {
 
@@ -41,6 +41,9 @@ public final class AmountRenderer extends DefaultTableCellRenderer {
 
     /**
      * Set the text value for the cell.  The supplied value must be a Number.
+     * At least 4 decimal places will be displayed for a Long value while
+     * the scale will determine the number of decimal places for a BigDecimal
+     * value.
      *
      * @param       value           The value for the cell
      */

@@ -31,7 +31,7 @@ public class Transaction {
 
     /** Transaction length */
     public static final int BASE_LENGTH = 149;
-    
+
     /** Signature offset in the transaction bytes */
     public static final int SIGNATURE_OFFSET = 69;
 
@@ -60,6 +60,12 @@ public class Transaction {
     private final long recipientId;
 
     /** Transaction type */
+    private final int type;
+
+    /** Transaction subtype */
+    private final int subtype;
+
+    /** Transaction type name */
     private final String transactionType;
 
     /** Transaction chain identifier */
@@ -116,11 +122,13 @@ public class Transaction {
         //
         // Get the transaction type
         //
-        Map<Integer, String> typeMap = Main.transactionTypes.get(response.getInt("type"));
+        type = response.getInt("type");
+        subtype = response.getInt("subtype");
+        Map<Integer, String> typeMap = Main.transactionTypes.get(type);
         if (typeMap != null) {
-            String subtype = typeMap.get(response.getInt("subtype"));
-            if (subtype != null) {
-                transactionType = subtype;
+            String subtypeName = typeMap.get(subtype);
+            if (subtypeName != null) {
+                transactionType = subtypeName;
             } else {
                 transactionType = "Unknown";
             }
@@ -140,8 +148,8 @@ public class Transaction {
         ByteBuffer buffer = ByteBuffer.wrap(transactionBytes);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
         chainId = buffer.getInt();
-        int type = buffer.get();
-        int subtype = buffer.get();
+        type = buffer.get();
+        subtype = buffer.get();
         version = buffer.get();
         timestamp = new Date(((long)buffer.getInt() * 1000L) + Main.epochBeginning);
         buffer.position(buffer.position() + 2);     // Skip deadline
@@ -181,6 +189,24 @@ public class Transaction {
      * Get the transaction type
      *
      * @return                      Transaction type
+     */
+    public int getType() {
+        return type;
+    }
+
+    /**
+     * Get the transaction subtype
+     *
+     * @return                      Transaction subtype
+     */
+    public int getSubtype() {
+        return subtype;
+    }
+
+    /**
+     * Get the transaction type name
+     *
+     * @return                      Transaction type name
      */
     public String getTransactionType() {
         return transactionType;

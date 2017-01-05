@@ -20,9 +20,6 @@ package org.ScripterRon.Nxt2Wallet;
  */
 public class Chain {
 
-    /** Value of one coin */
-    private final long ONE_COIN;
-
     /** Chain name */
     private final String name;
 
@@ -43,7 +40,6 @@ public class Chain {
         this.name = name;
         this.id = id;
         this.decimals = decimals;
-        this.ONE_COIN = (long)Math.pow(10.0, (double)decimals);
     }
 
     /**
