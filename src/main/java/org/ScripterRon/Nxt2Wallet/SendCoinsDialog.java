@@ -314,9 +314,7 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
                             JOptionPane.YES_NO_OPTION,
                             JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
                 return false;
-            byte[] signature = Crypto.sign(txBytes, secretPhrase);
-            System.arraycopy(signature, 0, txBytes, Transaction.SIGNATURE_OFFSET, 64);
-            Nxt.broadcastTransaction(txBytes);
+            Nxt.broadcastTransaction(txBytes, secretPhrase);
             broadcasted = true;
         } catch (KeyException exc) {
             Main.log.error("Unable to get public key from secret phrase", exc);
