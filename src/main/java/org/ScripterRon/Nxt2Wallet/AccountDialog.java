@@ -15,6 +15,9 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.IdentifierException;
+import org.ScripterRon.Nxt2API.Utils;
+
 import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;

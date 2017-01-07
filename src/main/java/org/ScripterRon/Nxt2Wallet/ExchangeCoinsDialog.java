@@ -15,14 +15,22 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.Chain;
+import org.ScripterRon.Nxt2API.Crypto;
+import org.ScripterRon.Nxt2API.KeyException;
+import org.ScripterRon.Nxt2API.Nxt;
+import org.ScripterRon.Nxt2API.Response;
+import org.ScripterRon.Nxt2API.Transaction;
+import org.ScripterRon.Nxt2API.Utils;
+
 import java.io.IOException;
+import java.util.Collection;
 
 import java.awt.Dialog;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -85,9 +93,10 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
         //
         // Create the chain field
         //
-        final String[] chainList = new String[Main.chains.size() - 1];
+        Collection<Chain> chains = Nxt.getAllChains();
+        final String[] chainList = new String[chains.size() - 1];
         int index = 0;
-        for (Chain mapChain : Main.chains.values()) {
+        for (Chain mapChain : chains) {
             if (mapChain != chain)
                 chainList[index++] = mapChain.getName();
         }
@@ -143,13 +152,13 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
         contentPane.add(Box.createVerticalStrut(15));
         contentPane.add(pricePane);
         contentPane.add(Box.createVerticalStrut(15));
-        if (chain.getId() != Main.fxtChainId) {
+        if (!chain.getName().equals(Nxt.FXT_CHAIN)) {
             Long rate = Main.bundlerRates.get(chain.getId());
             if (rate != null)
                 rateField.setText(Utils.nqtToString(rate, chain.getDecimals()));
             contentPane.add(ratePane);
             contentPane.add(Box.createVerticalStrut(15));
-            if (((String)chainField.getSelectedItem()).equals(Main.chains.get(Main.fxtChainId).getName()))
+            if (((String)chainField.getSelectedItem()).equals(Nxt.FXT_CHAIN))
                 rateField.setEnabled(false);
         }
         contentPane.add(feePane);
@@ -223,7 +232,7 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
     public void itemStateChanged(ItemEvent ie) {
         if (ie.getStateChange() == ItemEvent.SELECTED) {
             String name = (String)chainField.getSelectedItem();
-            if (name.equals(Main.chains.get(Main.fxtChainId).getName())) {
+            if (name.equals(Nxt.FXT_CHAIN)) {
                 rateField.setEnabled(false);
             } else {
                 rateField.setEnabled(true);
@@ -247,7 +256,7 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
                                               "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
             }
-            for (Chain mapChain : Main.chains.values()) {
+            for (Chain mapChain : Nxt.getAllChains()) {
                 if (mapChain.getName().equals(name)) {
                     exchangeChain = mapChain;
                     break;
@@ -276,7 +285,7 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
             //
             exchangeFee = Utils.stringToNQT(feeField.getText().trim(), chain.getDecimals());
             exchangeRate = Utils.stringToNQT(rateField.getText().trim(), chain.getDecimals());
-            if (chain.getId() == Main.fxtChainId || exchangeChain.getId() == Main.fxtChainId) {
+            if (chain.getName().equals(Nxt.FXT_CHAIN) || exchangeChain.getName().equals(Nxt.FXT_CHAIN)) {
                 exchangeRate = 0;
             } else if (exchangeFee == 0 && exchangeRate == 0) {
                 JOptionPane.showMessageDialog(this,
@@ -320,7 +329,7 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
         boolean broadcasted = false;
         try {
             byte[] publicKey = Crypto.getPublicKey(secretPhrase);
-            Response response = Request.exchangeCoins(chain, exchangeChain,
+            Response response = Nxt.exchangeCoins(chain, exchangeChain,
                     exchangeAmount, exchangePrice, exchangeFee, exchangeRate, publicKey);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Transaction tx = new Transaction(txBytes);
@@ -334,8 +343,9 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
                                               "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
             }
-            Chain txChain = (chain.getId() == Main.fxtChainId || exchangeChain.getId() == Main.fxtChainId ?
-                                Main.chains.get(Main.fxtChainId) : chain);
+            Chain txChain = (chain.getName().equals(Nxt.FXT_CHAIN) ||
+                                exchangeChain.getName().equals(Nxt.FXT_CHAIN) ?
+                                Nxt.getChain(Nxt.FXT_CHAIN) : chain);
             String confirmText = String.format("Do you want to exchange %s %s for %s with %s %s fee?",
                     Utils.nqtToString(exchangeAmount, chain.getDecimals()),
                     chain.getName(), exchangeChain.getName(),
@@ -346,7 +356,7 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
                 return false;
             byte[] signature = Crypto.sign(txBytes, secretPhrase);
             System.arraycopy(signature, 0, txBytes, Transaction.SIGNATURE_OFFSET, 64);
-            Request.broadcastTransaction(txBytes);
+            Nxt.broadcastTransaction(txBytes);
             broadcasted = true;
         } catch (KeyException exc) {
             Main.log.error("Unable to get public key from secret phrase", exc);

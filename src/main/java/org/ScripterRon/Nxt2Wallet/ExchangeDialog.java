@@ -15,17 +15,19 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.Chain;
+import org.ScripterRon.Nxt2API.Nxt;
+import org.ScripterRon.Nxt2API.Response;
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import java.awt.Color;
 import java.awt.Dialog;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ListSelectionModel;
@@ -71,7 +73,7 @@ public class ExchangeDialog extends JDialog implements ActionListener {
      * @param       chain           Chain
      * @param       responses       GetCoinExchangeOrders responses
      */
-    public ExchangeDialog(JFrame parent, Chain chain, List<Map<String, Object>> responses) {
+    public ExchangeDialog(JFrame parent, Chain chain, List<Response> responses) {
         super(parent, chain.getName() + " Exchange Orders", Dialog.ModalityType.DOCUMENT_MODAL);
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         this.chain = chain;
@@ -112,7 +114,7 @@ public class ExchangeDialog extends JDialog implements ActionListener {
      * @param       chain               Chain
      * @param       responses           GetCoinExchangeOrders responses
      */
-    public static void showDialog(JFrame parent, Chain chain, List<Map<String, Object>> responses) {
+    public static void showDialog(JFrame parent, Chain chain, List<Response> responses) {
         try {
             JDialog dialog = new ExchangeDialog(parent, chain, responses);
             dialog.pack();
@@ -176,7 +178,7 @@ public class ExchangeDialog extends JDialog implements ActionListener {
          * @param       responses       GetCoinExchangeOrders responses
          */
         public ExchangeTableModel(String[] columnNames, Class<?>[] columnClasses,
-                Chain chain, List<Map<String, Object>> responses) {
+                        Chain chain, List<Response> responses) {
             super();
             if (columnNames.length != columnClasses.length)
                 throw new IllegalArgumentException("Number of names not same as number of classes");
@@ -184,7 +186,7 @@ public class ExchangeDialog extends JDialog implements ActionListener {
             this.columnClasses = columnClasses;
             this.chain = chain;
             this.orders = new ArrayList<>(responses.size());
-            responses.forEach(map -> this.orders.add(new Order(new Response(map))));
+            responses.forEach(response -> this.orders.add(new Order(response)));
             this.orders.sort(null);
         }
 
@@ -285,7 +287,7 @@ public class ExchangeDialog extends JDialog implements ActionListener {
              * @param   response        Response to getCoinExchangeOrders
              */
             public Order(Response response) {
-                exchangeChain = Main.chains.get(response.getInt("chain"));
+                exchangeChain = Nxt.getChain(response.getInt("chain"));
                 amount = new BigDecimal(response.getLong("amountNQT"), MathContext.DECIMAL128)
                         .movePointLeft(exchangeChain.getDecimals());
                 price = new BigDecimal(response.getLong("askNQT"), MathContext.DECIMAL128)

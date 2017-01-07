@@ -15,13 +15,21 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.Chain;
+import org.ScripterRon.Nxt2API.Crypto;
+import org.ScripterRon.Nxt2API.IdentifierException;
+import org.ScripterRon.Nxt2API.KeyException;
+import org.ScripterRon.Nxt2API.Nxt;
+import org.ScripterRon.Nxt2API.Response;
+import org.ScripterRon.Nxt2API.Transaction;
+import org.ScripterRon.Nxt2API.Utils;
+
 import java.io.IOException;
 
 import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -131,7 +139,7 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         contentPane.add(Box.createVerticalStrut(15));
         contentPane.add(amountPane);
         contentPane.add(Box.createVerticalStrut(15));
-        if (chain.getId() != Main.fxtChainId) {
+        if (!chain.getName().equals(Nxt.FXT_CHAIN)) {
             Long rate = Main.bundlerRates.get(chain.getId());
             if (rate != null)
                 rateField.setText(Utils.nqtToString(rate, chain.getDecimals()));
@@ -240,7 +248,7 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
             //
             sendFee = Utils.stringToNQT(feeField.getText().trim(), chain.getDecimals());
             sendRate = Utils.stringToNQT(rateField.getText().trim(), chain.getDecimals());
-            if (sendFee == 0 && sendRate == 0 && chain.getId() != Main.fxtChainId) {
+            if (sendFee == 0 && sendRate == 0 && !chain.getName().equals(Nxt.FXT_CHAIN)) {
                 JOptionPane.showMessageDialog(this,
                         "You must enter either a fee or a rate for a child chain transaction",
                         "Error", JOptionPane.ERROR_MESSAGE);
@@ -286,7 +294,7 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         boolean broadcasted = false;
         try {
             byte[] publicKey = Crypto.getPublicKey(secretPhrase);
-            Response response = Request.sendMoney(sendAddress, chain,
+            Response response = Nxt.sendMoney(sendAddress, chain,
                     sendAmount, sendFee, sendRate, publicKey);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Transaction tx = new Transaction(txBytes);
@@ -308,7 +316,7 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
                 return false;
             byte[] signature = Crypto.sign(txBytes, secretPhrase);
             System.arraycopy(signature, 0, txBytes, Transaction.SIGNATURE_OFFSET, 64);
-            Request.broadcastTransaction(txBytes);
+            Nxt.broadcastTransaction(txBytes);
             broadcasted = true;
         } catch (KeyException exc) {
             Main.log.error("Unable to get public key from secret phrase", exc);

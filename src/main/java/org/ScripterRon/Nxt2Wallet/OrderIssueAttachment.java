@@ -15,6 +15,11 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.Chain;
+import org.ScripterRon.Nxt2API.Nxt;
+import org.ScripterRon.Nxt2API.Response;
+import org.ScripterRon.Nxt2API.Transaction;
+
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -45,13 +50,13 @@ public class OrderIssueAttachment {
      */
     public OrderIssueAttachment(Response response) throws IllegalArgumentException, NumberFormatException {
         int chainId = response.getInt("chain");
-        chain = Main.chains.get(chainId);
+        chain = Nxt.getChain(chainId);
         if (chain == null)
-            throw new IllegalArgumentException("Chain " + chainId + " is not valid");
+            throw new IllegalArgumentException("Chain " + chainId + " is not defined");
         chainId = response.getInt("exchangeChain");
-        exchangeChain = Main.chains.get(chainId);
+        exchangeChain = Nxt.getChain(chainId);
         if (exchangeChain == null)
-            throw new IllegalArgumentException("Exchange chain " + chainId + " is not valid");
+            throw new IllegalArgumentException("Exchange chain " + chainId + " is not defined");
         quantity = response.getLong("quantityQNT");
         price = response.getLong("priceNQT");
     }
@@ -72,13 +77,13 @@ public class OrderIssueAttachment {
         if (version != 1)
             throw new IllegalArgumentException("Attachment version " + version + " is not supported");
         int chainId = buffer.getInt();
-        chain = Main.chains.get(chainId);
+        chain = Nxt.getChain(chainId);
         if (chain == null)
-            throw new IllegalArgumentException("Chain " + chainId + " is not valid");
+            throw new IllegalArgumentException("Chain " + chainId + " is not defined");
         chainId = buffer.getInt();
-        exchangeChain = Main.chains.get(chainId);
+        exchangeChain = Nxt.getChain(chainId);
         if (exchangeChain == null)
-            throw new IllegalArgumentException("Exchange chain " + chainId + " is not valid");
+            throw new IllegalArgumentException("Exchange chain " + chainId + " is not defined");
         quantity = buffer.getLong();
         price = buffer.getLong();
     }

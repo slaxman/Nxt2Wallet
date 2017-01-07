@@ -15,6 +15,8 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.IdentifierException;
+
 import java.util.Collections;
 
 import java.awt.Color;
@@ -24,7 +26,6 @@ import java.awt.datatransfer.StringSelection;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JDialog;

@@ -15,10 +15,11 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.IdentifierException;
+
 import java.awt.Dialog;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
-
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;

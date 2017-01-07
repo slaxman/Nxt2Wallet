@@ -9,6 +9,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <nxt2api.version>1.0.0</nxt2api.version>
         <slf4j.version>1.7.21</slf4j.version>
         <json.version>1.0.0</json.version>
     </properties>
@@ -37,7 +38,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.1</version>
+                    <version>3.6.0</version>
                     <configuration>
                         <source>${maven.compiler.source}</source>
                         <target>${maven.compiler.target}</target>
@@ -49,7 +50,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>2.4</version>
+                <version>3.0.2</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -64,7 +65,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>2.8</version>
+                <version>3.0.0</version>
                 <executions>
                     <execution>
                         <id>copy-dependencies</id>
@@ -85,7 +86,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
-                <version>2.6</version>
+                <version>3.0.2</version>
                 <configuration>
                     <nonFilteredFileExtensions>
                         <nonFilteredFileExtension>dat</nonFilteredFileExtension>
@@ -105,6 +106,12 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-jdk14</artifactId>
             <version>${slf4j.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.ScripterRon</groupId>
+            <artifactId>Nxt2API</artifactId>
+            <version>${nxt2api.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

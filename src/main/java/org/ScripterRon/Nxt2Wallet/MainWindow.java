@@ -15,14 +15,13 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Point;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import org.ScripterRon.Nxt2API.Chain;
+import org.ScripterRon.Nxt2API.Event;
+import org.ScripterRon.Nxt2API.IdentifierException;
+import org.ScripterRon.Nxt2API.Nxt;
+import org.ScripterRon.Nxt2API.Response;
+import org.ScripterRon.Nxt2API.Transaction;
+import org.ScripterRon.Nxt2API.Utils;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -35,6 +34,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -189,12 +196,12 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         //
         // Create the transaction tables
         //
-        tableCount = Main.chains.size();
+        tableCount = Nxt.getAllChains().size();
         table = new JTable[tableCount];
         tableModel = new TransactionTableModel[tableCount];
         tabbedPane = new JTabbedPane();
         int index = 0;
-        for (Chain chain : Main.chains.values()) {
+        for (Chain chain : Nxt.getAllChains()) {
             tableModel[index] = new TransactionTableModel(columnNames, columnClasses, chain);
             table[index] = new SizedTable(tableModel[index], columnTypes);
             table[index].setRowSorter(new TableRowSorter<>(tableModel[index]));
@@ -328,7 +335,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
      */
     private void viewExchange(Chain chain) {
         try {
-            Response response = Request.getCoinExchangeOrders(chain);
+            Response response = Nxt.getCoinExchangeOrders(chain);
             ExchangeDialog.showDialog(this, chain, response.getObjectList("orders"));
         } catch (IOException exc) {
             Main.log.error("Unable to get exchange orders", exc);
@@ -344,45 +351,51 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
      */
     private void changeAccount() {
         //
-        // Get the account
+        // Get the new account information
         //
         long accountId = AccountDialog.showDialog(this);
         if (accountId == 0)
             return;
+        int i = Main.accounts.indexOf(accountId);
+        final String secretPhrase = (i >= 0 ? Main.secretPhrases.get(i) : "");
+        final List<Transaction> accountTransactions = new ArrayList<>();
+        final List<Transaction> unconfirmedTransactions = new ArrayList<>();
+        final Map<Integer, Long> balances = new HashMap<>();
+        final String name;
+        try {
+            name = Main.getAccount(accountId, accountTransactions, unconfirmedTransactions,
+                                   balances);
+        } catch (IdentifierException exc) {
+            Main.log.error("Invalid Nxt object identifier in response", exc);
+            Main.logException("Invalid Nxt object identifier in response", exc);
+            return;
+        } catch (IOException exc) {
+            Main.log.error("Unable to get initial account information", exc);
+            Main.logException("Unable to get initial account information", exc);
+            return;
+        }
         //
-        // Stop the event handler and process pending Swing events
+        // Switch to the new account
         //
         stopEventHandler();
         SwingUtilities.invokeLater(() -> {
-            //
-            // Switch to the new account
-            //
-            try {
-                int i = Main.accounts.indexOf(accountId);
-                if (i >= 0) {
-                    Main.passPhrase = Main.secretPhrases.get(i);
-                } else {
-                    Main.passPhrase = "";
-                }
-                Main.accountId = accountId;
-                Main.accountRsId = Utils.getAccountRsId(accountId);
-                Main.accountTransactions.clear();
-                Main.unconfirmedTransactions.clear();
-                Main.getAccount();
-                for (TransactionTableModel model : tableModel) {
-                    model.resetTransactions();
-                }
-                StringBuilder sb = new StringBuilder(64);
-                sb.append(Utils.idToString(Main.accountId)).append(" / ").append(Main.accountRsId);
-                if (Main.accountName.length() != 0)
-                    sb.append(" (").append(Main.accountName).append(")");
-                accountField.setText("<html><b>Account:   " + sb.toString() + "</b></html>");
-                updateNodeStatus();
-                startEventHandler();
-            } catch (IOException exc) {
-                Main.log.error("Unable to get initial account information", exc);
-                Main.logException("Unable to get initial account information", exc);
+            Main.passPhrase = secretPhrase;
+            Main.accountId = accountId;
+            Main.accountRsId = Utils.getAccountRsId(accountId);
+            Main.accountName = name;
+            Main.accountTransactions = accountTransactions;
+            Main.unconfirmedTransactions = unconfirmedTransactions;
+            Main.accountBalance = balances;
+            for (TransactionTableModel model : tableModel) {
+                model.resetTransactions();
             }
+            StringBuilder sb = new StringBuilder(64);
+            sb.append(Utils.idToString(Main.accountId)).append(" / ").append(Main.accountRsId);
+             if (Main.accountName.length() != 0)
+                sb.append(" (").append(Main.accountName).append(")");
+            accountField.setText("<html><b>Account:   " + sb.toString() + "</b></html>");
+            updateNodeStatus();
+            startEventHandler();
         });
     }
 
@@ -406,7 +419,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         //
         try {
             List<String> eventList = new ArrayList<>();
-            Request.eventRegister(eventList, eventToken, false, true);
+            Nxt.eventRegister(eventList, eventToken, false, true);
         } catch (IOException exc) {
             Main.log.error("Unable to cancel event listener", exc);
             Main.logException("Unable to cancel event listener", exc);
@@ -416,7 +429,6 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
     /**
      * Process server events
      */
-    @SuppressWarnings("unchecked")
     @Override
     public void run() {
         Main.log.debug("Event handler started");
@@ -433,7 +445,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             eventList.add("Transaction.ADDED_CONFIRMED_TRANSACTIONS." + Main.accountRsId);
             eventList.add("Transaction.ADDED_UNCONFIRMED_TRANSACTIONS." + Main.accountRsId);
             eventList.add("Transaction.REMOVED_UNCONFIRMED_TRANSACTIONS." + Main.accountRsId);
-            Response eventResponse = Request.eventRegister(eventList, 0, false, false);
+            Response eventResponse = Nxt.eventRegister(eventList, 0, false, false);
             eventToken = eventResponse.getLong("token");
         } catch (IOException exc) {
             Main.log.error("Unable to register our events", exc);
@@ -452,7 +464,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 //
                 // Wait for an event
                 //
-                List<Event> eventList = Request.eventWait(eventToken, 60);
+                List<Event> eventList = Nxt.eventWait(eventToken, 60);
                 if (shutdown)
                     break;
                 if (eventList.isEmpty())
@@ -464,7 +476,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 for (Event event : eventList) {
                     switch (event.getName()) {
                         case "Block.BLOCK_PUSHED":
-                            response = Request.getBlockchainStatus();
+                            response = Nxt.getBlockchainStatus();
                             Main.blockHeight = response.getInt("numberOfBlocks") - 1;
                             SwingUtilities.invokeAndWait(() -> {
                                 for (TransactionTableModel model : tableModel) {
@@ -479,9 +491,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                                 if (eventParts.length != 2) {
                                     Main.log.error("Invalid transaction event id: " + eventId);
                                 } else {
-                                    final Chain txChain = Main.chains.get(Integer.valueOf(eventParts[0]));
+                                    final Chain txChain = Nxt.getChain(Integer.valueOf(eventParts[0]));
                                     byte[] fullHash = Utils.parseHexString(eventParts[1]);
-                                    response = Request.getTransaction(fullHash, txChain);
+                                    response = Nxt.getTransaction(fullHash, txChain);
                                     final Transaction addedTx = new Transaction(response);
                                     SwingUtilities.invokeAndWait(() -> {
                                         tableMap.get(txChain.getId()).addTransaction(addedTx);
@@ -515,8 +527,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 //
                 // Update the account balances
                 //
-                for (Chain chain : Main.chains.values()) {
-                    response = Request.getBalance(Main.accountId, chain);
+                for (Chain chain : Nxt.getAllChains()) {
+                    response = Nxt.getBalance(Main.accountId, chain);
                     Main.accountBalance.put(chain.getId(), response.getLong("unconfirmedBalanceNQT"));
                 }
                 SwingUtilities.invokeLater(() -> updateNodeStatus());
@@ -544,7 +556,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         StringBuilder sb = new StringBuilder(64);
         sb.append("<html><b>Account balances:   ");
         boolean firstBalance = true;
-        for (Chain chain : Main.chains.values()) {
+        for (Chain chain : Nxt.getAllChains()) {
             if (!firstBalance)
                 sb.append(", ");
             sb.append(Utils.nqtToString(Main.accountBalance.get(chain.getId()), chain.getDecimals()))
@@ -683,13 +695,13 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             // Build the initial transaction list
             //
             Main.accountTransactions.forEach(tx -> {
-                if (tx.getChainId() == chain.getId()) {
+                if (tx.getChain() == chain) {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
                 }
             });
             Main.unconfirmedTransactions.forEach(tx -> {
-                if (tx.getChainId() == chain.getId()) {
+                if (tx.getChain() == chain) {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
                 }
@@ -769,7 +781,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                     value = Utils.idToString(tx.getId());
                     break;
                 case 2:                                 // Type
-                    value = tx.getTransactionType();
+                    value = tx.getTransactionType().getName();
                     break;
                 case 3:                                 // Account
                     long accountId = tx.getSenderId();
@@ -843,13 +855,13 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
             // Build the initial transaction list
             //
             Main.accountTransactions.forEach(tx -> {
-                if (tx.getChainId() == chain.getId()) {
+                if (tx.getChain() == chain) {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
                 }
             });
             Main.unconfirmedTransactions.forEach(tx -> {
-                if (tx.getChainId() == chain.getId()) {
+                if (tx.getChain() == chain) {
                     txList.add(tx);
                     txMap.put(tx.getId(), tx);
                 }
@@ -873,7 +885,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
          * @param       tx              Transaction
          */
         public void addTransaction(Transaction tx) {
-            if (tx.getChainId() == chain.getId()) {
+            if (tx.getChain() == chain) {
                 Transaction listTx = txMap.get(tx.getId());
                 if (listTx != null) {
                     if (listTx.getBlockId() != tx.getBlockId() && tx.getBlockId() != 0) {
@@ -932,7 +944,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         public void removeUnconfirmedTransaction(byte[] fullHash) {
             long txId = Utils.fullHashToId(fullHash);
             Transaction tx = txMap.get(txId);
-            if (tx != null && tx.getBlockId() == 0 && tx.getType() == -1) {
+            if (tx != null && tx.getBlockId() == 0 && tx.getTransactionType().getType() == -1) {
                 txList.remove(tx);
                 txMap.remove(txId);
                 fireTableDataChanged();

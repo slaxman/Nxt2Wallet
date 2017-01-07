@@ -15,6 +15,9 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.IdentifierException;
+import org.ScripterRon.Nxt2API.Utils;
+
 import java.io.EOFException;
 import java.io.InputStream;
 import java.io.OutputStream;

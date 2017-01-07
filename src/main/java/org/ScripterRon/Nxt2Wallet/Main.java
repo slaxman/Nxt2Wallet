@@ -15,6 +15,16 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.Chain;
+import org.ScripterRon.Nxt2API.Crypto;
+import org.ScripterRon.Nxt2API.IdentifierException;
+import org.ScripterRon.Nxt2API.KeyException;
+import org.ScripterRon.Nxt2API.Nxt;
+import org.ScripterRon.Nxt2API.NxtException;
+import org.ScripterRon.Nxt2API.Response;
+import org.ScripterRon.Nxt2API.Transaction;
+import org.ScripterRon.Nxt2API.Utils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +44,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.logging.LogManager;
 
 import javax.swing.JFrame;
@@ -95,12 +104,6 @@ public class Main {
     /** Use HTTPS connections */
     public static boolean useSSL = true;
 
-    /** Allow host name mismatch */
-    public static boolean allowNameMismatch = false;
-
-    /** Accept any server certificate */
-    public static boolean acceptAnyCertificate = false;
-
     /** Nxt node application */
     public static String nxtApplication;
 
@@ -134,29 +137,17 @@ public class Main {
     /** Contact lookup by account identifier */
     public static final Map<Long, Contact> contactsMap = new HashMap<>();
 
-    /** Nxt chains */
-    public static final Map<Integer, Chain> chains = new HashMap<>();
-
-    /** FXT (ARDR) chain identifier */
-    public static int fxtChainId;
-
-    /** Nxt transaction types */
-    public static final Map<Integer, Map<Integer, String>> transactionTypes = new HashMap<>();
-
     /** Child transaction bundler rates */
     public static final Map<Integer, Long> bundlerRates = new HashMap<>();
 
     /** Account confirmed transactions */
-    public static final List<Transaction> accountTransactions = new ArrayList<>();
+    public static List<Transaction> accountTransactions = new ArrayList<>();
 
     /** Account unconfirmed transactions */
-    public static final List<Transaction> unconfirmedTransactions = new ArrayList<>();
+    public static List<Transaction> unconfirmedTransactions = new ArrayList<>();
 
     /** Account balances */
-    public static final Map<Integer, Long> accountBalance = new HashMap<>();
-
-    /** Nxt epoch (milliseconds since January 1, 1970) */
-    public static long epochBeginning;
+    public static Map<Integer, Long> accountBalance = new HashMap<>();
 
     /** Application lock file */
     private static RandomAccessFile lockFile;
@@ -284,10 +275,13 @@ public class Main {
     /**
      * Start our services
      */
-    @SuppressWarnings("unchecked")
     private static void startup() {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            //
+            // Initialize the Nxt API library
+            //
+            Nxt.init(connect, apiPort, useSSL);
             //
             // Get the account if one wasn't provided
             //
@@ -324,57 +318,25 @@ public class Main {
             //
             // Get the local Nxt node state
             //
-            Response response = Request.getBlockchainStatus();
+            Response response = Nxt.getBlockchainStatus();
             nxtApplication = response.getString("application");
             nxtVersion = response.getString("version");
             blockHeight = response.getInt("numberOfBlocks") - 1;
             log.info(String.format("%s Version %s: Chain height %,d",
                                    nxtApplication, nxtVersion, blockHeight));
             //
-            // Get the Nxt configuration
-            //
-            response = Request.getConstants();
-            epochBeginning = response.getLong("epochBeginning");
-            //
-            // Get the chains
-            //
-            response.getObject("chainProperties").values().forEach(entry -> {
-                Response chainProperties = new Response((Map<String, Object>)entry);
-                Chain chain = new Chain(chainProperties.getString("name"),
-                                        chainProperties.getInt("id"),
-                                        chainProperties.getInt("decimals"));
-                chains.put(chain.getId(), chain);
-                if (chain.getName().equals("ARDR"))
-                    fxtChainId = chain.getId();
-            });
-            //
-            // Get the transaction types
-            //
-            response.getObject("transactionTypes").entrySet().forEach(entry -> {
-                int type = Integer.valueOf(entry.getKey());
-                Map<String, Object> subtypes = (Map<String, Object>)((Map<String, Object>)entry.getValue()).get("subtypes");
-                Set<Map.Entry<String, Object>> subtypeSet = subtypes.entrySet();
-                Map<Integer, String> transactionSubtypes = new HashMap<>();
-                subtypeSet.forEach(subentry -> {
-                    int subtype = Integer.valueOf(subentry.getKey());
-                    String name = (String)((Map<String, Object>)subentry.getValue()).get("name");
-                    transactionSubtypes.put(subtype, name);
-                });
-                transactionTypes.put(type, transactionSubtypes);
-            });
-            //
             // Get the child transaction bundler rates
             //
-            response = Request.getBundlerRates();
-            List<Map<String, Object>> rates = response.getObjectList("rates");
+            response = Nxt.getBundlerRates();
+            List<Response> rates = response.getObjectList("rates");
             rates.forEach(rate -> {
-                Response rateResponse = new Response(rate);
-                bundlerRates.put(rateResponse.getInt("chain"), rateResponse.getLong("minRateNQTPerFXT"));
+                bundlerRates.put(rate.getInt("chain"), rate.getLong("minRateNQTPerFXT"));
              });
             //
             // Get the initial account information
             //
-            getAccount();
+            accountName = getAccount(accountId, accountTransactions, unconfirmedTransactions,
+                    accountBalance);
             //
             // Start the GUI
             //
@@ -395,29 +357,38 @@ public class Main {
     /**
      * Get account information
      *
-     * @throws  IOException         Unable to issue Nxt API request
+     * @param   accountId               Account identifier
+     * @param   transactionList         Account transactions list
+     * @param   unconfirmedList         Unconfirmed account transactions list
+     * @param   balances                Account balances
+     * @return                          Account name
+     * @throws  IdentifierException     Invalid Nxt object identifier
+     * @throws  IOException             Unable to issue Nxt API request
      */
-    public static void getAccount() throws IOException {
-        Response response = Request.getAccount(accountId);
-        accountName = response.getString("name");
-        for (Chain chain : chains.values()) {
-            List<Map<String, Object>> txList;
+    public static String getAccount(long accountId, List<Transaction> transactionList,
+                                List<Transaction> unconfirmedList, Map<Integer, Long> balances)
+                                throws IdentifierException, IOException {
+        Response response = Nxt.getAccount(accountId);
+        String name = response.getString("name");
+        for (Chain chain : Nxt.getAllChains()) {
+            List<Response> txList;
             for (int index=0; ; index+=50) {
-                response = Request.getBlockchainTransactions(accountId, chain, index, index+49);
+                response = Nxt.getBlockchainTransactions(accountId, chain, index, index+49);
                 txList = response.getObjectList("transactions");
                 if (!txList.isEmpty())
-                    accountTransactions.addAll(Transaction.processTransactions(txList));
+                    transactionList.addAll(Transaction.processTransactions(txList));
                 if (txList.size() < 50)
                     break;
             }
-            response = Request.getUnconfirmedTransactions(accountId, chain);
+            response = Nxt.getUnconfirmedTransactions(accountId, chain);
             txList = response.getObjectList("unconfirmedTransactions");
             if (!txList.isEmpty()) {
-                unconfirmedTransactions.addAll(Transaction.processTransactions(txList));
+                unconfirmedList.addAll(Transaction.processTransactions(txList));
             }
-            response = Request.getBalance(accountId, chain);
-            accountBalance.put(chain.getId(), response.getLong("unconfirmedBalanceNQT"));
+            response = Nxt.getBalance(accountId, chain);
+            balances.put(chain.getId(), response.getLong("unconfirmedBalanceNQT"));
         }
+        return name;
     }
 
     /**
@@ -523,12 +494,6 @@ public class Main {
                 option = line.substring(0, sep).trim().toLowerCase();
                 value = line.substring(sep+1).trim();
                 switch (option) {
-                    case "acceptanycertificate":
-                        acceptAnyCertificate = Boolean.valueOf(value);
-                        break;
-                    case "allownamemismatch":
-                        allowNameMismatch = Boolean.valueOf(value);
-                        break;
                     case "apiport":
                         apiPort = Integer.valueOf(value);
                         break;

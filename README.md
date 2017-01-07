@@ -46,11 +46,5 @@ The following configuration options can be specified in Nxt2Wallet.conf.  This f
   - useSSL=boolean      
     Specify 'true' to use HTTPS or 'false' to use HTTP to connect to the NRS node.  The default is 'true'.  HTTP is always used when connected to 'localhost'.
     
-  - allowNameMismatch=boolean       
-    Specify 'true' to allow an HTTPS connection or 'false' to reject an HTTPS connection if the host name does not match the SSL certificate name.  The default is 'false'.
-    
-  - acceptAnyCertificate=boolean	
-    Specify 'true' to accept the server certificate without verifying the trust path or 'false' to verify the certificate trust path before accepting the connection.  The default is 'false'.
-    
   - account=id      
     Specify the Nxt account as either an identifier or a Reed-Solomon string.  This parameter can be repeated to define multiple accounts.  You will be prompted to enter the account if this parameter is not specified.  The account must exist before you can use Nxt2Wallet.  An account is created by sending coins or a message to the account from an existing account.    
