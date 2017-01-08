@@ -335,8 +335,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
      */
     private void viewExchange(Chain chain) {
         try {
-            Response response = Nxt.getCoinExchangeOrders(chain);
-            ExchangeDialog.showDialog(this, chain, response.getObjectList("orders"));
+            List<Response> txList = Nxt.getCoinExchangeOrders(chain);
+            ExchangeDialog.showDialog(this, chain, txList);
         } catch (IOException exc) {
             Main.log.error("Unable to get exchange orders", exc);
             Main.logException("Unable to get exchange orders", exc);

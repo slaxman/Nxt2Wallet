@@ -373,15 +373,13 @@ public class Main {
         for (Chain chain : Nxt.getAllChains()) {
             List<Response> txList;
             for (int index=0; ; index+=50) {
-                response = Nxt.getBlockchainTransactions(accountId, chain, index, index+49);
-                txList = response.getObjectList("transactions");
+                txList = Nxt.getBlockchainTransactions(accountId, chain, index, index+49);
                 if (!txList.isEmpty())
                     transactionList.addAll(Transaction.processTransactions(txList));
                 if (txList.size() < 50)
                     break;
             }
-            response = Nxt.getUnconfirmedTransactions(accountId, chain);
-            txList = response.getObjectList("unconfirmedTransactions");
+            txList = Nxt.getUnconfirmedTransactions(accountId, chain);
             if (!txList.isEmpty()) {
                 unconfirmedList.addAll(Transaction.processTransactions(txList));
             }
