@@ -59,6 +59,9 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
     /** Exchange rate field */
     private final JTextField rateField;
 
+    /** Message field */
+    private final JTextField messageField;
+
     /** Chain */
     private final Chain chain;
 
@@ -73,6 +76,9 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
 
     /** Send rate */
     private long sendRate = 0;
+
+    /** Send message */
+    private String sendMessage;
 
     /**
      * Create the dialog
@@ -124,6 +130,13 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         feePane.add(new JLabel("Fee  ", JLabel.RIGHT));
         feePane.add(feeField);
         //
+        // Create the message field
+        //
+        messageField = new JTextField("", 64);
+        JPanel messagePane = new JPanel();
+        messagePane.add(new JLabel("Message  ", JLabel.RIGHT));
+        messagePane.add(messageField);
+        //
         // Create the buttons (Send, Done)
         //
         JPanel buttonPane = new ButtonPane(this, 10, new String[] {"Send", "send"},
@@ -147,6 +160,7 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
             contentPane.add(Box.createVerticalStrut(15));
         }
         contentPane.add(feePane);
+        contentPane.add(messagePane);
         contentPane.add(Box.createVerticalStrut(15));
         contentPane.add(buttonPane);
         setContentPane(contentPane);
@@ -254,6 +268,10 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
                         "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
             }
+            //
+            // Get the message
+            //
+            sendMessage = messageField.getText().trim();
         } catch (ArithmeticException exc) {
             JOptionPane.showMessageDialog(this, "Too many decimal digits specified", "Error",
                                           JOptionPane.ERROR_MESSAGE);
@@ -295,8 +313,10 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         try {
             byte[] publicKey = Crypto.getPublicKey(secretPhrase);
             Response response = Nxt.sendMoney(sendAddress, chain,
-                    sendAmount, sendFee, sendRate, publicKey);
+                    sendAmount, sendFee, sendRate, publicKey, sendMessage);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
+            Response txJSON = response.getObject("transactionJSON");
+            Response prunableJSON = txJSON.getObject("attachment");
             Transaction tx = new Transaction(txBytes);
             if (sendFee == 0)
                 sendFee = tx.getFee();
@@ -314,7 +334,9 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
                             JOptionPane.YES_NO_OPTION,
                             JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
                 return false;
-            Nxt.broadcastTransaction(txBytes, secretPhrase);
+            Nxt.broadcastTransaction(txBytes,
+                    (sendMessage.length() > 0 ? prunableJSON.toJSONString() : null),
+                    secretPhrase);
             broadcasted = true;
         } catch (KeyException exc) {
             Main.log.error("Unable to get public key from secret phrase", exc);
