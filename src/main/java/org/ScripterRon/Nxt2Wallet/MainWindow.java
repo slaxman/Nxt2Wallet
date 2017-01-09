@@ -474,6 +474,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 //
                 Response response;
                 for (Event event : eventList) {
+                    if (Main.log.isDebugEnabled()) {
+                        Main.log.debug("Processing event " + event.getName() + ": " + event.getIds());
+                    }
                     switch (event.getName()) {
                         case "Block.BLOCK_PUSHED":
                             response = Nxt.getBlockchainStatus();
