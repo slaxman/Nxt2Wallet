@@ -340,7 +340,7 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
                 exchangeFee = tx.getFee();
             if (tx.getFee() != exchangeFee || tx.getSenderId() != Main.accountId ||
                     attachment.getChain() != chain || attachment.getExchangeChain() != exchangeChain ||
-                    attachment.getQuantity() != exchangeAmount || attachment.getPrice() != exchangePrice) {
+                    attachment.getAmount() != exchangeAmount || attachment.getPrice() != exchangePrice) {
                 JOptionPane.showMessageDialog(this, "Transaction returned by Nxt node is not valid",
                                               "Error", JOptionPane.ERROR_MESSAGE);
                 return false;

@@ -40,6 +40,8 @@ import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import javax.swing.BorderFactory;
@@ -50,6 +52,7 @@ import javax.swing.JLabel;
 import javax.swing.JMenuBar;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
@@ -104,6 +107,9 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
 
     /** Transaction table */
     private final JTable[] table;
+
+    /** Transaction table popup */
+    private final JPopupMenu tablePopup;
 
     /** Transaction table model */
     private final TransactionTableModel[] tableModel;
@@ -200,12 +206,15 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         table = new JTable[tableCount];
         tableModel = new TransactionTableModel[tableCount];
         tabbedPane = new JTabbedPane();
+        tablePopup = new PopupMenu(this, new String[] {"View Transaction", "view transaction"});
+        TableMouseListener mouseListener = new TableMouseListener();
         int index = 0;
         for (Chain chain : Nxt.getAllChains()) {
             tableModel[index] = new TransactionTableModel(columnNames, columnClasses, chain);
             table[index] = new SizedTable(tableModel[index], columnTypes);
             table[index].setRowSorter(new TableRowSorter<>(tableModel[index]));
             table[index].setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            table[index].addMouseListener(mouseListener);
             JScrollPane scrollPane = new JScrollPane(table[index]);
             JPanel tablePane = new JPanel(new BorderLayout());
             tablePane.setBackground(Color.WHITE);
@@ -261,6 +270,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         // "send nxt"           - Send Nxt
         // "view contacts"      - View contacts
         // "view exchange"      - View exchange orders
+        // "view transaction"   - View transaction details
         //
         try {
             int tab;
@@ -298,9 +308,54 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                         viewExchange(tableModel[tab].getChain());
                     }
                     break;
+                case "view transaction":
+                    tab = tabbedPane.getSelectedIndex();
+                    if (tab >= 0) {
+                        JTable popupTable = table[tab];
+                        TransactionTableModel popupModel = tableModel[tab];
+                        int row = popupTable.getSelectedRow();
+                        if (row >= 0) {
+                            row = popupTable.convertRowIndexToModel(row);
+                            Transaction tx = popupModel.getTransaction(row);
+                            JOptionPane.showMessageDialog(this, tx.toString(), "Transaction Details",
+                                    JOptionPane.INFORMATION_MESSAGE);
+                        }
+                    }
+                    break;
             }
         } catch (Exception exc) {
             Main.logException("Exception while processing action event", exc);
+        }
+    }
+
+    /**
+     * Mouse listener for the transaction table
+     */
+    private class TableMouseListener extends MouseAdapter {
+
+        /**
+         * Mouse button released
+         *
+         * We will select the table row at the mouse pointer for a popup trigger event
+         * if the row is not already selected.  We will then display the popup menu.
+         * This allows the action listener to determine the row for the popup event.
+         *
+         * @param   event           Mouse event
+         */
+        @Override
+        public void mouseReleased(MouseEvent event) {
+            if (event.isPopupTrigger()) {
+                JTable popupTable = (JTable)event.getSource();
+                for (JTable txTable : table) {
+                    if (txTable == popupTable) {
+                        int row = txTable.rowAtPoint(event.getPoint());
+                        if (row >= 0 && !txTable.isRowSelected(row))
+                            txTable.changeSelection(row, 0, false, false);
+                        tablePopup.show(event.getComponent(), event.getX(), event.getY());
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -846,6 +901,16 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
          */
         public int getChainId() {
             return chain.getId();
+        }
+
+        /**
+         * Get the transaction for the specified row
+         *
+         * @param   row         Table row
+         * @return              Transaction
+         */
+        public Transaction getTransaction(int row) {
+            return txList.get(row);
         }
 
         /**
