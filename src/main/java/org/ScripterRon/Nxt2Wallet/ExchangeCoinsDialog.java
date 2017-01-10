@@ -334,8 +334,8 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
                     exchangeAmount, exchangePrice, exchangeFee, exchangeRate, publicKey);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Transaction tx = new Transaction(txBytes);
-            CoinExchangeAttachment.ExchangeOrderIssueAttachment attachment =
-                    (CoinExchangeAttachment.ExchangeOrderIssueAttachment)tx.getAttachment();
+            CoinExchangeAttachment.OrderIssueAttachment attachment =
+                    (CoinExchangeAttachment.OrderIssueAttachment)tx.getAttachment();
             if (exchangeFee == 0)
                 exchangeFee = tx.getFee();
             if (tx.getFee() != exchangeFee || tx.getSenderId() != Main.accountId ||

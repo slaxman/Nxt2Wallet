@@ -38,6 +38,9 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -206,7 +209,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         table = new JTable[tableCount];
         tableModel = new TransactionTableModel[tableCount];
         tabbedPane = new JTabbedPane();
-        tablePopup = new PopupMenu(this, new String[] {"View Transaction", "view transaction"});
+        tablePopup = new PopupMenu(this, new String[] {"Copy Transaction Hash", "copy hash"},
+                                         new String[] {"View Transaction", "view transaction"});
         TableMouseListener mouseListener = new TableMouseListener();
         int index = 0;
         for (Chain chain : Nxt.getAllChains()) {
@@ -266,6 +270,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         //
         // "about"              - Display information about this program
         // "change account"     - Change the Nxt account
+        // "copy hash"          - Copy transaction hash to clipboard
         // "exit"               - Exit the program
         // "send nxt"           - Send Nxt
         // "view contacts"      - View contacts
@@ -274,6 +279,10 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         //
         try {
             int tab;
+            int row;
+            JTable popupTable;
+            TransactionTableModel popupModel;
+            Transaction tx;
             String action = ae.getActionCommand();
             switch (action) {
                 case "about":
@@ -308,15 +317,30 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                         viewExchange(tableModel[tab].getChain());
                     }
                     break;
+                case "copy hash":
+                    tab = tabbedPane.getSelectedIndex();
+                    if (tab >= 0) {
+                        popupTable = table[tab];
+                        popupModel = tableModel[tab];
+                        row = popupTable.getSelectedRow();
+                        if (row >= 0) {
+                            row = popupTable.convertRowIndexToModel(row);
+                            tx = popupModel.getTransaction(row);
+                            StringSelection sel = new StringSelection(Utils.toHexString(tx.getFullHash()));
+                            Clipboard cb = Toolkit.getDefaultToolkit().getSystemClipboard();
+                            cb.setContents(sel, null);
+                        }
+                    }
+                    break;
                 case "view transaction":
                     tab = tabbedPane.getSelectedIndex();
                     if (tab >= 0) {
-                        JTable popupTable = table[tab];
-                        TransactionTableModel popupModel = tableModel[tab];
-                        int row = popupTable.getSelectedRow();
+                        popupTable = table[tab];
+                        popupModel = tableModel[tab];
+                        row = popupTable.getSelectedRow();
                         if (row >= 0) {
                             row = popupTable.convertRowIndexToModel(row);
-                            Transaction tx = popupModel.getTransaction(row);
+                            tx = popupModel.getTransaction(row);
                             JOptionPane.showMessageDialog(this, tx.toString(), "Transaction Details",
                                     JOptionPane.INFORMATION_MESSAGE);
                         }
