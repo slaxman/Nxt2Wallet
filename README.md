@@ -3,6 +3,12 @@ Nxt2Wallet
 
 Nxt2Wallet supports sending and receiving ARDR as well as Nxt child coins.  It communicates with the Nxt2 node using an HTTP/HTTPS connection to the API port.  Your secret phrase is never sent to the API server, so it is safe to use a remote node.  The only data that is saved locally is the contact list.  All other account data is maintained by the Nxt2 network.
 
+Each Nxt coin is shown in a separate tabbed pane.  You can right-click on a transaction to get a popup menu.  The Send Money and View Exchange buttons apply to the current tab.  The View Contacts button is the same for all tabs since the contacts list is shared by all of the coins.
+
+Child transactions are bundled together for inclusion in the Nxt block chain.  Each bundler advertised a minimum rate and will not accept transactions with a fee lower than this rate.  Transactions have a fixed ARDR cost.  If a bundler advertises a rate of 0.10, for example, then the child transaction fee must be at least 0.10 for each ARDR.  So, if a transaction costs 40 ARDR, then the child transaction fee must be at least 4.  Nxt2Wallet will pre-fill the rate field with the best bundler rate currently available and you can change it if desired.  Transactions submitted directly to the block chain (FXT transactions) do not use a bundler and the transaction fee must be the required number of ARDR for the transaction.
+
+The View Exchange button shows Coin Exchange offers for the current coin.  You can enter a coin exchange order for the current coin to either match an existing order or to create a new order with a different price.  The exchange amount is the number of coins you want to exchange and the price is how much you want to pay for each coin you receive.  Your exchange order will be filled at this price or at a lower price depending on the matching orders.
+
 
 Build
 =====
