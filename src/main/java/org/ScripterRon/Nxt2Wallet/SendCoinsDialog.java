@@ -312,6 +312,12 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
         boolean broadcasted = false;
         try {
             byte[] publicKey = Crypto.getPublicKey(secretPhrase);
+            if (Utils.getAccountId(publicKey) != Main.accountId) {
+                JOptionPane.showMessageDialog(this, "The secret phrase is not correct",
+                        "Incorrect Secret Phrase", JOptionPane.ERROR_MESSAGE);
+                Main.passPhrase = "";
+                return false;
+            }
             Response response = Nxt.sendMoney(sendAddress, chain,
                     sendAmount, sendFee, sendRate, publicKey, sendMessage);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
@@ -322,6 +328,7 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
                 sendFee = tx.getFee();
             if (tx.getRecipientId() != sendAddress || tx.getAmount() != sendAmount ||
                     tx.getFee() != sendFee || tx.getSenderId() != Main.accountId) {
+                Main.log.debug("Send Money transaction is not valid:\n" + txJSON.toJSONString());
                 JOptionPane.showMessageDialog(this, "Transaction returned by Nxt node is not valid",
                                               "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
