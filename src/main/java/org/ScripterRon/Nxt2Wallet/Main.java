@@ -15,6 +15,7 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.Balance;
 import org.ScripterRon.Nxt2API.Chain;
 import org.ScripterRon.Nxt2API.Crypto;
 import org.ScripterRon.Nxt2API.IdentifierException;
@@ -147,7 +148,7 @@ public class Main {
     public static List<Transaction> unconfirmedTransactions = new ArrayList<>();
 
     /** Account balances */
-    public static Map<Integer, Long> accountBalance = new HashMap<>();
+    public static Map<Integer, Balance> accountBalance = new HashMap<>();
 
     /** Application lock file */
     private static RandomAccessFile lockFile;
@@ -335,8 +336,7 @@ public class Main {
             //
             // Get the initial account information
             //
-            accountName = getAccount(accountId, accountTransactions, unconfirmedTransactions,
-                    accountBalance);
+            accountName = getAccount(accountId, accountTransactions, unconfirmedTransactions, accountBalance);
             //
             // Start the GUI
             //
@@ -366,7 +366,7 @@ public class Main {
      * @throws  IOException             Unable to issue Nxt API request
      */
     public static String getAccount(long accountId, List<Transaction> transactionList,
-                                List<Transaction> unconfirmedList, Map<Integer, Long> balances)
+                                List<Transaction> unconfirmedList, Map<Integer, Balance> balances)
                                 throws IdentifierException, IOException {
         Response response = Nxt.getAccount(accountId);
         String name = response.getString("name");
@@ -383,8 +383,7 @@ public class Main {
             if (!txList.isEmpty()) {
                 unconfirmedList.addAll(Transaction.processTransactions(txList));
             }
-            response = Nxt.getBalance(accountId, chain);
-            balances.put(chain.getId(), response.getLong("unconfirmedBalanceNQT"));
+            balances.put(chain.getId(), Nxt.getBalance(accountId, chain));
         }
         return name;
     }

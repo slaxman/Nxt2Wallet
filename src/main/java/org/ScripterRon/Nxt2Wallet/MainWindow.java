@@ -15,6 +15,7 @@
  */
 package org.ScripterRon.Nxt2Wallet;
 
+import org.ScripterRon.Nxt2API.Balance;
 import org.ScripterRon.Nxt2API.Chain;
 import org.ScripterRon.Nxt2API.Event;
 import org.ScripterRon.Nxt2API.IdentifierException;
@@ -439,11 +440,10 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         final String secretPhrase = (i >= 0 ? Main.secretPhrases.get(i) : "");
         final List<Transaction> accountTransactions = new ArrayList<>();
         final List<Transaction> unconfirmedTransactions = new ArrayList<>();
-        final Map<Integer, Long> balances = new HashMap<>();
+        final Map<Integer, Balance> balances = new HashMap<>();
         final String name;
         try {
-            name = Main.getAccount(accountId, accountTransactions, unconfirmedTransactions,
-                                   balances);
+            name = Main.getAccount(accountId, accountTransactions, unconfirmedTransactions, balances);
         } catch (IdentifierException exc) {
             Main.log.error("Invalid Nxt object identifier in response", exc);
             Main.logException("Invalid Nxt object identifier in response", exc);
@@ -609,11 +609,11 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                 //
                 // Update the account balances
                 //
-                for (Chain chain : Nxt.getAllChains()) {
-                    response = Nxt.getBalance(Main.accountId, chain);
-                    Main.accountBalance.put(chain.getId(), response.getLong("unconfirmedBalanceNQT"));
-                }
-                SwingUtilities.invokeLater(() -> updateNodeStatus());
+                Map<Integer, Balance> balances = Nxt.getBalances(Main.accountId);
+                SwingUtilities.invokeLater(() -> {
+                    Main.accountBalance = balances;
+                    updateNodeStatus();
+                });
             } catch (InterruptedException | InvocationTargetException exc) {
                 Main.log.error("Unable to perform status update", exc);
                 Main.logException("Unable to perform status update", exc);
@@ -641,7 +641,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         for (Chain chain : Nxt.getAllChains()) {
             if (!firstBalance)
                 sb.append(", ");
-            sb.append(Utils.nqtToString(Main.accountBalance.get(chain.getId()), chain.getDecimals()))
+            sb.append(Utils.nqtToString(
+                    Main.accountBalance.get(chain.getId()).getUnconfirmedBalance(), chain.getDecimals()))
                     .append(" ").append(chain.getName());
             firstBalance = false;
         }
