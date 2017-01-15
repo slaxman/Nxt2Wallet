@@ -210,7 +210,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         table = new JTable[tableCount];
         tableModel = new TransactionTableModel[tableCount];
         tabbedPane = new JTabbedPane();
-        tablePopup = new PopupMenu(this, new String[] {"Copy Transaction Hash", "copy hash"},
+        tablePopup = new PopupMenu(this, new String[] {"Copy Transaction ID", "copy id"},
+                                         new String[] {"Copy Transaction Hash", "copy hash"},
                                          new String[] {"View Transaction", "view transaction"});
         TableMouseListener mouseListener = new TableMouseListener();
         int index = 0;
@@ -272,6 +273,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         // "about"              - Display information about this program
         // "change account"     - Change the Nxt account
         // "copy hash"          - Copy transaction hash to clipboard
+        // "copy id"            - Copy transaction identifier to clipboard
         // "exit"               - Exit the program
         // "send nxt"           - Send Nxt
         // "view contacts"      - View contacts
@@ -316,6 +318,21 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
                                                       "Error", JOptionPane.ERROR_MESSAGE);
                     } else {
                         viewExchange(tableModel[tab].getChain());
+                    }
+                    break;
+                case "copy id":
+                    tab = tabbedPane.getSelectedIndex();
+                    if (tab >= 0) {
+                        popupTable = table[tab];
+                        popupModel = tableModel[tab];
+                        row = popupTable.getSelectedRow();
+                        if (row >= 0) {
+                            row = popupTable.convertRowIndexToModel(row);
+                            tx = popupModel.getTransaction(row);
+                            StringSelection sel = new StringSelection(Utils.idToString(tx.getId()));
+                            Clipboard cb = Toolkit.getDefaultToolkit().getSystemClipboard();
+                            cb.setContents(sel, null);
+                        }
                     }
                     break;
                 case "copy hash":
