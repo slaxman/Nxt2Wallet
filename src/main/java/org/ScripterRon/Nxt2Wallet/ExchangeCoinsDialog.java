@@ -266,7 +266,7 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
             //
             // Get the exchange amount
             //
-            exchangeAmount = Utils.stringToNQT(amountField.getText().trim(), chain.getDecimals());
+            exchangeAmount = Utils.stringToNQT(amountField.getText().trim(), exchangeChain.getDecimals());
             if (exchangeAmount <= 0) {
                 JOptionPane.showMessageDialog(this, "You must enter the amount to exchange",
                                               "Error", JOptionPane.ERROR_MESSAGE);
@@ -348,9 +348,9 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
             Chain txChain = (chain.getName().equals(Nxt.FXT_CHAIN) ||
                                 exchangeChain.getName().equals(Nxt.FXT_CHAIN) ?
                                 Nxt.getChain(Nxt.FXT_CHAIN) : chain);
-            String confirmText = String.format("Do you want to exchange %s %s for %s with %s %s fee?",
-                    Utils.nqtToString(exchangeAmount, chain.getDecimals()),
-                    chain.getName(), exchangeChain.getName(),
+            String confirmText = String.format("Do you want to exchange %s for %s %s with %s %s fee?",
+                    chain.getName(),
+                    Utils.nqtToString(exchangeAmount, exchangeChain.getDecimals()), exchangeChain.getName(),
                     Utils.nqtToString(exchangeFee, txChain.getDecimals()), txChain.getName());
             if (JOptionPane.showConfirmDialog(this, confirmText, "Exchange Coins",
                             JOptionPane.YES_NO_OPTION,

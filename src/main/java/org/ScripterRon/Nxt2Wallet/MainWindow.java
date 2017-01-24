@@ -432,8 +432,8 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
      */
     private void viewExchange(Chain chain) {
         try {
-            List<Response> txList = Nxt.getCoinExchangeOrders(chain);
-            ExchangeDialog.showDialog(this, chain, txList);
+            List<Response> orderList = Nxt.getCoinExchangeOrders(chain);
+            ExchangeDialog.showDialog(this, chain, orderList);
         } catch (IOException exc) {
             Main.log.error("Unable to get exchange orders", exc);
             Main.logException("Unable to get exchange orders", exc);
@@ -657,7 +657,7 @@ public class MainWindow extends JFrame implements ActionListener, Runnable {
         boolean firstBalance = true;
         for (Chain chain : Nxt.getAllChains()) {
             if (!firstBalance)
-                sb.append(", ");
+                sb.append(",  ");
             sb.append(Utils.nqtToString(
                     Main.accountBalance.get(chain.getId()).getUnconfirmedBalance(), chain.getDecimals()))
                     .append(" ").append(chain.getName());
