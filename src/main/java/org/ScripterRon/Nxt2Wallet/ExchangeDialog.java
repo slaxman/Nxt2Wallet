@@ -287,11 +287,8 @@ public class ExchangeDialog extends JDialog implements ActionListener {
              */
             public Order(Response response) {
                 exchangeChain = Nxt.getChain(response.getInt("chain"));
-                amount = BigDecimal.valueOf(response.getLong("quantityQNT"), chain.getDecimals())
-                        .multiply(BigDecimal.valueOf(response.getLong("bidNQT"), exchangeChain.getDecimals()))
-                        .movePointRight(chain.getDecimals()).divideToIntegralValue(BigDecimal.ONE).stripTrailingZeros()
-                        .movePointLeft(chain.getDecimals());
-                price = new BigDecimal(response.getLong("askNQT")).movePointLeft(chain.getDecimals());
+                amount = BigDecimal.valueOf(response.getLong("exchangeQNT"), exchangeChain.getDecimals());
+                price = BigDecimal.valueOf(response.getLong("askNQT"), chain.getDecimals());
                 account = response.getString("accountRS");
             }
 

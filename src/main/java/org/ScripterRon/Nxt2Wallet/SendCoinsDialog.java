@@ -319,7 +319,8 @@ public class SendCoinsDialog extends JDialog implements ActionListener {
                 return false;
             }
             Response response = Nxt.sendMoney(sendAddress, chain,
-                    sendAmount, sendFee, sendRate, publicKey, sendMessage);
+                    sendAmount,
+                    (sendFee != 0 ? sendFee : -1), sendRate, publicKey, sendMessage);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Response txJSON = response.getObject("transactionJSON");
             Response prunableJSON = txJSON.getObject("attachment");

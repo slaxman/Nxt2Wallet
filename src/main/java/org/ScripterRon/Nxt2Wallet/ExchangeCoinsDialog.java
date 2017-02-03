@@ -331,7 +331,8 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
         try {
             byte[] publicKey = Crypto.getPublicKey(secretPhrase);
             Response response = Nxt.exchangeCoins(chain, exchangeChain,
-                    exchangeAmount, exchangePrice, exchangeFee, exchangeRate, publicKey);
+                    exchangeAmount, exchangePrice,
+                    (exchangeFee != 0 ? exchangeFee : -1), exchangeRate, publicKey);
             byte[] txBytes = response.getHexString("unsignedTransactionBytes");
             Transaction tx = new Transaction(txBytes);
             CoinExchangeAttachment.OrderIssueAttachment attachment =
