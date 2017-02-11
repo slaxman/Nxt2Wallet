@@ -284,15 +284,19 @@ public class ExchangeCoinsDialog extends JDialog implements ActionListener, Item
             //
             // Get the fee amount and the exchange rate
             //
-            exchangeFee = Utils.stringToNQT(feeField.getText().trim(), chain.getDecimals());
-            exchangeRate = Utils.stringToNQT(rateField.getText().trim(), chain.getDecimals());
-            if (chain.getName().equals(Nxt.FXT_CHAIN) || exchangeChain.getName().equals(Nxt.FXT_CHAIN)) {
+            Chain fxtChain = Nxt.getChain(Nxt.FXT_CHAIN);
+            if (chain == fxtChain || exchangeChain == fxtChain) {
+                exchangeFee = Utils.stringToNQT(feeField.getText().trim(), fxtChain.getDecimals());
                 exchangeRate = 0;
-            } else if (exchangeFee == 0 && exchangeRate == 0) {
-                JOptionPane.showMessageDialog(this,
-                        "You must enter either a fee or a rate for a child chain transaction",
-                        "Error", JOptionPane.ERROR_MESSAGE);
-                return false;
+            } else {
+                exchangeFee = Utils.stringToNQT(feeField.getText().trim(), chain.getDecimals());
+                exchangeRate = Utils.stringToNQT(rateField.getText().trim(), chain.getDecimals());
+                if (exchangeFee == 0 && exchangeRate == 0) {
+                    JOptionPane.showMessageDialog(this,
+                            "You must enter either a fee or a rate for a child chain transaction",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    return false;
+                }
             }
         } catch (ArithmeticException exc) {
             JOptionPane.showMessageDialog(this, "Too many decimal digits specified", "Error",
